@@ -27,7 +27,7 @@ bull-vs-bear/
 │   │   └── store.py       #   Person 2: Supabase (in-memory fallback)
 │   └── tests/
 ├── shared/
-│   ├── schemas/           # The 3 JSON shapes, agreed in hour 0
+│   ├── schemas/           # JSON Schemas, generated from backend/app/schemas.py
 │   └── examples/          # Fake data everyone builds against
 ├── .env.example           # Key names only, never real keys
 └── render.yaml            # Backend deploy
@@ -68,11 +68,11 @@ Set `NEXT_PUBLIC_USE_MOCK=false` to talk to the real backend.
 | POST | `/debates` `{ticker}` | `{debate_id}` |
 | GET | `/debates/{id}` | full debate for replay |
 | GET | `/debates/{id}/brief` | committee brief |
-| WS | `/ws/debates/{id}` | streams `fact_sheet`, `line` (one per turn), `brief`; accepts `{type: "interrupt", question}` |
+| WS | `/ws/debates/{id}` | streams `fact_sheet`, `positions`, `turn_start` + `line` per turn, `brief`; accepts `{type: "interrupt", question}` |
 
 ## Shared data shapes
 
-See [shared/README.md](shared/README.md). Change them only with the whole team's agreement, in all three places.
+See [shared/README.md](shared/README.md) for the shapes, how ids connect them, the WebSocket protocol and how to change them.
 
 ## Ground rules
 

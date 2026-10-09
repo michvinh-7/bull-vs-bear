@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "Point": {
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "Position": {
+      "properties": {
+        "thesis": {
+          "title": "Thesis",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "title": "Points",
+          "type": "array"
+        }
+      },
+      "required": [
+        "thesis"
+      ],
+      "title": "Position",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "bull": {
+      "$ref": "#/$defs/Position"
+    },
+    "bear": {
+      "$ref": "#/$defs/Position"
+    }
+  },
+  "required": [
+    "bull",
+    "bear"
+  ],
+  "title": "Positions",
+  "type": "object"
+}

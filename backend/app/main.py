@@ -6,7 +6,7 @@ Endpoints
   POST /debates                 start a debate -> {debate_id}
   GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
   GET  /debates/{id}/brief      committee brief only
-  WS   /ws/debates/{id}         streams LineMessages; accepts interrupts
+  WS   /ws/debates/{id}         streams the debate; accepts interrupts
 """
 import asyncio
 import uuid
@@ -50,7 +50,7 @@ def companies():
 
 @app.post("/debates", response_model=StartDebateResponse)
 def start_debate(req: StartDebateRequest):
-    debate = Debate(id=uuid.uuid4().hex[:12], ticker=req.ticker.upper())
+    debate = Debate(id=uuid.uuid4().hex[:12], ticker=req.ticker.upper(), max_turns=config.MAX_TURNS)
     store.save_debate(debate)
     return StartDebateResponse(debate_id=debate.id)
 
@@ -73,9 +73,12 @@ def get_brief(debate_id: str):
 
 @app.websocket("/ws/debates/{debate_id}")
 async def debate_socket(ws: WebSocket, debate_id: str):
-    """Server -> client messages:
+    """Server -> client messages, in order:
          {"type": "fact_sheet", "data": FactSheet}
-         {"type": "line",       "data": LineMessage}
+         {"type": "positions",  "data": Positions}
+         {"type": "turn_start", "turn": int, "speaker": str, "max_turns": int}   (show "thinking…")
+         {"type": "line",       "data": LineMessage}                             (labels + audio ready)
+         ... turn_start / line repeat ...
          {"type": "brief",      "data": CommitteeBrief}
          {"type": "error",      "message": str}
        Client -> server messages:
@@ -99,20 +102,30 @@ async def debate_socket(ws: WebSocket, debate_id: str):
     try:
         debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
+        debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
+        await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
 
         next_side = "bull"
         turn = 1
-        while turn <= config.MAX_TURNS:
+        while turn <= debate.max_turns:
             # An interrupt becomes a moderator turn; the side that was due answers next.
             question = None if interrupts.empty() else interrupts.get_nowait()
             speaker = "moderator" if question else next_side
+            await ws.send_json(
+                {"type": "turn_start", "turn": turn, "speaker": speaker, "max_turns": debate.max_turns}
+            )
 
             line = await asyncio.to_thread(
                 agents.generate_turn, debate.fact_sheet, debate.lines, speaker, turn, question
             )
-            line.claims = await asyncio.to_thread(verify.check_claims, line.claims)
-            if config.VOICE_ENABLED:
-                line.audio_url = await asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, turn)
+            # Fact-check and voice in parallel, then send the line complete.
+            claims, audio_url = await asyncio.gather(
+                asyncio.to_thread(verify.check_claims, line.claims, debate.fact_sheet),
+                asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, turn)
+                if config.VOICE_ENABLED
+                else asyncio.sleep(0, result=""),
+            )
+            line.claims, line.audio_url = claims, audio_url
 
             debate.lines.append(line)
             store.save_debate(debate)
@@ -148,6 +161,8 @@ async def _listen_for_interrupts(ws: WebSocket, queue: asyncio.Queue):
 async def _replay(ws: WebSocket, debate: Debate):
     if debate.fact_sheet:
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
+    if debate.positions:
+        await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
     for line in debate.lines:
         await ws.send_json({"type": "line", "data": line.model_dump()})
         await asyncio.sleep(0.5)

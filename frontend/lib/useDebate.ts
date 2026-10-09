@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { USE_MOCK, wsUrl } from "./api";
-import type { CommitteeBrief, FactSheet, LineMessage, ServerMessage } from "./types";
-import mockFactSheet from "./mock/fact_sheet.json";
-import mockLines from "./mock/line_messages.json";
-import mockBrief from "./mock/committee_brief.json";
+import { mockDebate } from "./mock";
+import type { CommitteeBrief, FactSheet, LineMessage, Positions, ServerMessage, Speaker } from "./types";
 
 type Status = "connecting" | "live" | "done" | "error";
 
 /** Connects to the debate stream (or plays mock data) and plays audio in order. */
 export function useDebate(debateId: string) {
   const [factSheet, setFactSheet] = useState<FactSheet | null>(null);
+  const [positions, setPositions] = useState<Positions | null>(null);
   const [lines, setLines] = useState<LineMessage[]>([]);
   const [brief, setBrief] = useState<CommitteeBrief | null>(null);
+  // Who is generating the next line right now ("Bear is thinking…"); null between turns.
+  const [thinking, setThinking] = useState<{ turn: number; speaker: Speaker } | null>(null);
+  const [maxTurns, setMaxTurns] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>("connecting");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -22,18 +24,30 @@ export function useDebate(debateId: string) {
 
   const handle = useCallback(
     (msg: ServerMessage) => {
-      if (msg.type === "fact_sheet") setFactSheet(msg.data);
-      if (msg.type === "line") {
-        setLines((prev) => [...prev, msg.data]);
-        if (msg.data.audio_url) enqueue(msg.data.audio_url);
-      }
-      if (msg.type === "brief") {
-        setBrief(msg.data);
-        setStatus("done");
-      }
-      if (msg.type === "error") {
-        setError(msg.message);
-        setStatus("error");
+      switch (msg.type) {
+        case "fact_sheet":
+          setFactSheet(msg.data);
+          break;
+        case "positions":
+          setPositions(msg.data);
+          break;
+        case "turn_start":
+          setThinking({ turn: msg.turn, speaker: msg.speaker });
+          setMaxTurns(msg.max_turns);
+          break;
+        case "line":
+          setThinking(null);
+          setLines((prev) => [...prev, msg.data]);
+          if (msg.data.audio_url) enqueue(msg.data.audio_url);
+          break;
+        case "brief":
+          setBrief(msg.data);
+          setStatus("done");
+          break;
+        case "error":
+          setError(msg.message);
+          setStatus("error");
+          break;
       }
     },
     [enqueue],
@@ -42,12 +56,17 @@ export function useDebate(debateId: string) {
   useEffect(() => {
     if (USE_MOCK) {
       setStatus("live");
+      const m = mockDebate;
       const queue: ServerMessage[] = [
-        { type: "fact_sheet", data: mockFactSheet as FactSheet },
-        ...(mockLines as LineMessage[]).map((data) => ({ type: "line" as const, data })),
-        { type: "brief", data: mockBrief as CommitteeBrief },
+        { type: "fact_sheet", data: m.fact_sheet! },
+        { type: "positions", data: m.positions! },
+        ...m.lines.flatMap((data): ServerMessage[] => [
+          { type: "turn_start", turn: data.turn, speaker: data.speaker, max_turns: m.max_turns },
+          { type: "line", data },
+        ]),
+        { type: "brief", data: m.brief! },
       ];
-      const timers = queue.map((m, i) => setTimeout(() => handle(m), i * 1500));
+      const timers = queue.map((msg, i) => setTimeout(() => handle(msg), i * 900));
       return () => timers.forEach(clearTimeout);
     }
 
@@ -66,14 +85,14 @@ export function useDebate(debateId: string) {
     if (USE_MOCK) {
       setLines((prev) => [
         ...prev,
-        { turn: prev.length + 1, speaker: "moderator", text: question, claims: [], audio_url: "" },
+        { turn: prev.length + 1, speaker: "moderator", from_user: true, text: question, claims: [], audio_url: "" },
       ]);
       return;
     }
     wsRef.current?.send(JSON.stringify({ type: "interrupt", question }));
   }, []);
 
-  return { factSheet, lines, brief, status, error, interrupt, audio };
+  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, audio };
 }
 
 /** Plays audio clips one after another. TODO(Person 3): pause/mute controls, preload next clip. */
