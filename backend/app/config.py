@@ -1,4 +1,4 @@
-"""Reads settings from environment variables (.env locally, dashboard on Render)."""
+"""Reads settings from environment variables (.env locally, dashboard on Railway)."""
 import os
 
 from dotenv import load_dotenv
