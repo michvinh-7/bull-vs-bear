@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getDebate } from "@/lib/api";
 import { findSource } from "@/lib/format";
 import { DISCLAIMER, type Debate } from "@/lib/types";
 
-export default function BriefPage({ params }: { params: { id: string } }) {
+export default function BriefPage() {
+  const { id } = useParams<{ id: string }>();
   // Loads the whole debate so brief items can link back to claims and their sources.
   const [debate, setDebate] = useState<Debate | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getDebate(params.id).then(setDebate).catch((e) => setError(e.message));
-  }, [params.id]);
+    getDebate(id).then(setDebate).catch((e) => setError(e.message));
+  }, [id]);
 
   if (error) return <main className="p-6 text-unsupported">{error}</main>;
   if (!debate) return <main className="p-6 text-neutral-400">Loading brief…</main>;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useDebate } from "@/lib/useDebate";
 import { findSource, formatMetric } from "@/lib/format";
@@ -12,8 +13,9 @@ const SPEAKER_STYLE = {
   moderator: { name: "Portfolio manager", box: "bg-mod-bg self-center text-center", tag: "text-mod", ring: "ring-mod" },
 };
 
-export default function DebateRoom({ params }: { params: { id: string } }) {
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt } = useDebate(params.id);
+export default function DebateRoom() {
+  const { id } = useParams<{ id: string }>();
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt } = useDebate(id);
   const [question, setQuestion] = useState("");
   const speaking: Speaker | undefined = thinking?.speaker ?? lines.at(-1)?.speaker;
 
@@ -62,7 +64,7 @@ export default function DebateRoom({ params }: { params: { id: string } }) {
               Interrupt
             </button>
             <input
-              className="flex-1 rounded-full border border-line bg-bg px-4 py-2 text-sm outline-none"
+              className="flex-1 rounded-full border border-line bg-bg px-4 py-2 text-sm outline-hidden"
               placeholder="Ask the committee a question…"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
@@ -75,7 +77,7 @@ export default function DebateRoom({ params }: { params: { id: string } }) {
 
       {error && <p className="text-unsupported">{error}</p>}
       {brief && (
-        <Link href={`/brief/${params.id}`} className="self-center rounded-lg bg-neutral-100 px-4 py-2 font-semibold text-black">
+        <Link href={`/brief/${id}`} className="self-center rounded-lg bg-neutral-100 px-4 py-2 font-semibold text-black">
           Read the committee brief →
         </Link>
       )}
@@ -150,7 +152,7 @@ function ClaimChip({ claim, sheet }: { claim: Claim; sheet: FactSheet | null }) 
   return (
     <button
       onClick={() => setOpen(!open)}
-      className={`rounded border px-2 py-0.5 text-left font-mono text-xs ${LABEL_COLOR[claim.label]}`}
+      className={`rounded-sm border px-2 py-0.5 text-left font-mono text-xs ${LABEL_COLOR[claim.label]}`}
     >
       {claim.label} · {source?.label ?? "no source"}
       {open && source && <span className="mt-1 block font-sans text-neutral-300">“{source.excerpt}”</span>}
