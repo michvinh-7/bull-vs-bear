@@ -1,7 +1,7 @@
 """FastAPI app: the producer. Runs the debate and calls every other service.
 
 Endpoints
-  GET  /health                  liveness check for Render
+  GET  /health                  liveness check for Railway
   GET  /companies               the pre-cached demo companies
   POST /debates                 start a debate -> {debate_id}
   GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
