@@ -23,5 +23,5 @@ def render(model) -> str:
 
 if __name__ == "__main__":
     for name, model in SHAPES.items():
-        (OUT / f"{name}.schema.json").write_text(render(model))
+        (OUT / f"{name}.schema.json").write_text(render(model), encoding="utf-8")
         print(f"wrote shared/schemas/{name}.schema.json")

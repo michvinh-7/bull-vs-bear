@@ -11,7 +11,7 @@ EXAMPLES = Path(__file__).resolve().parents[2] / "shared" / "examples"
 
 
 def load(name):
-    return json.loads((EXAMPLES / name).read_text())
+    return json.loads((EXAMPLES / name).read_text(encoding="utf-8"))
 
 
 def test_examples_match_models():
@@ -48,7 +48,7 @@ def test_example_ids_resolve():
 
 def test_json_schemas_in_sync():
     for name, model in SHAPES.items():
-        on_disk = (OUT / f"{name}.schema.json").read_text()
+        on_disk = (OUT / f"{name}.schema.json").read_text(encoding="utf-8")
         assert on_disk == render(model), f"Run `python -m scripts.export_schemas` ({name} is stale)"
 
 
