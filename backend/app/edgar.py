@@ -31,9 +31,20 @@ def get_company_facts(cik: str) -> dict:
     r.raise_for_status()
     return r.json()
 
-
+""" [TODO] as a stretch goal, probably a good idea to look into 10-k vs 10-k/a, that would be the ammended version"""
 def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
-    """TODO(Person 1): find the latest filing of `form` in the submissions feed,
-    download its primary document, and return plain text (keep page markers so
-    claims can cite "p. 84")."""
-    raise NotImplementedError
+    r = httpx.get(f"https://data.sec.gov/submissions/CIK{cik}.json", headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    # the recent section includes both the document number (accession) and the doc type in form
+    recent = data["filings"]["recent"]
+    for i, f in enumerate(recent["form"]):
+        if f == form:
+            accessionNum = recent["accessionNumber"][i].replace("-", "")
+            docName = recent["primaryDocument"][i]
+            # url is from https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
+            r = httpx.get(f"https://www.sec.gov/Archives/edgar/data/(cik)/{accessionNum}/{docName}", headers=HEADERS, timeout=30)
+            r.raise_for_status()
+            return r.text
+    # this is a number given to every SEC file, won't necessarily be a 10-k
+    raise ValueError(f"{form} not found for CIK: {cik}")
