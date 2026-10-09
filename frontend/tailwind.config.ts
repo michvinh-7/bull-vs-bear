@@ -16,7 +16,11 @@ const config: Config = {
         contested: "#facc15",
         unsupported: "#f87171",
       },
-      fontFamily: { mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"] },
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "Menlo", "monospace"],
+      },
     },
   },
   plugins: [],
