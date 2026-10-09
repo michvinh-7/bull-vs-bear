@@ -1,23 +1,133 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "CommitteeBrief",
-  "description": "One per debate, written by the moderator at the end. Never contains a buy/sell verdict.",
-  "type": "object",
-  "required": ["agreed", "disputed", "unsupported", "open_questions"],
-  "properties": {
-    "agreed": { "type": "array", "items": { "type": "string" } },
-    "disputed": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["bull", "bear"],
-        "properties": {
-          "bull": { "type": "string" },
-          "bear": { "type": "string" }
+  "$defs": {
+    "AgreedPoint": {
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
         }
-      }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "AgreedPoint",
+      "type": "object"
     },
-    "unsupported": { "type": "array", "items": { "type": "string" } },
-    "open_questions": { "type": "array", "items": { "type": "string" } }
-  }
+    "DisputedPoint": {
+      "properties": {
+        "topic": {
+          "title": "Topic",
+          "type": "string"
+        },
+        "bull": {
+          "title": "Bull",
+          "type": "string"
+        },
+        "bear": {
+          "title": "Bear",
+          "type": "string"
+        },
+        "claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "topic",
+        "bull",
+        "bear"
+      ],
+      "title": "DisputedPoint",
+      "type": "object"
+    },
+    "OpenQuestion": {
+      "properties": {
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "where_to_look": {
+          "description": "e.g. \"10-K · Item 7A, market risk\"",
+          "title": "Where To Look",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "where_to_look"
+      ],
+      "title": "OpenQuestion",
+      "type": "object"
+    },
+    "UnsupportedClaim": {
+      "properties": {
+        "claim_id": {
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "speaker": {
+          "enum": [
+            "bull",
+            "bear"
+          ],
+          "title": "Speaker",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim_id",
+        "speaker",
+        "text"
+      ],
+      "title": "UnsupportedClaim",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "agreed": {
+      "items": {
+        "$ref": "#/$defs/AgreedPoint"
+      },
+      "title": "Agreed",
+      "type": "array"
+    },
+    "disputed": {
+      "items": {
+        "$ref": "#/$defs/DisputedPoint"
+      },
+      "title": "Disputed",
+      "type": "array"
+    },
+    "unsupported": {
+      "description": "Built in Python from claim labels, not by Gemini",
+      "items": {
+        "$ref": "#/$defs/UnsupportedClaim"
+      },
+      "title": "Unsupported",
+      "type": "array"
+    },
+    "open_questions": {
+      "items": {
+        "$ref": "#/$defs/OpenQuestion"
+      },
+      "title": "Open Questions",
+      "type": "array"
+    }
+  },
+  "title": "CommitteeBrief",
+  "type": "object"
 }

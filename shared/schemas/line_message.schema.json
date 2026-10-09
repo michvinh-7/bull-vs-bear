@@ -1,26 +1,91 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "LineMessage",
-  "description": "One per debate turn, sent over the WebSocket.",
-  "type": "object",
-  "required": ["turn", "speaker", "text", "claims", "audio_url"],
-  "properties": {
-    "turn": { "type": "integer", "minimum": 1 },
-    "speaker": { "enum": ["bull", "bear", "moderator"] },
-    "text": { "type": "string" },
-    "claims": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["text", "label", "source", "passage"],
-        "properties": {
-          "text": { "type": "string" },
-          "label": { "enum": ["verified", "contested", "unsupported", "pending"] },
-          "source": { "type": "string" },
-          "passage": { "type": "string" }
+  "$defs": {
+    "Claim": {
+      "properties": {
+        "id": {
+          "description": "\"t{turn}c{n}\", e.g. \"t2c1\"; the brief links back to these",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Must be an id in fact_sheet.sources; null means Unsupported",
+          "title": "Source Id"
+        },
+        "label": {
+          "default": "pending",
+          "enum": [
+            "verified",
+            "contested",
+            "unsupported",
+            "pending"
+          ],
+          "title": "Label",
+          "type": "string"
         }
-      }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "Claim",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "turn": {
+      "title": "Turn",
+      "type": "integer"
     },
-    "audio_url": { "type": "string", "description": "Empty string until voice is generated." }
-  }
+    "speaker": {
+      "enum": [
+        "bull",
+        "bear",
+        "moderator"
+      ],
+      "title": "Speaker",
+      "type": "string"
+    },
+    "from_user": {
+      "default": false,
+      "description": "True when a moderator line relays a user's interrupt",
+      "title": "From User",
+      "type": "boolean"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "audio_url": {
+      "default": "",
+      "title": "Audio Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "turn",
+    "speaker",
+    "text"
+  ],
+  "title": "LineMessage",
+  "type": "object"
 }

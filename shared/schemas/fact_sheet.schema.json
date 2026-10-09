@@ -1,39 +1,193 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "FactSheet",
-  "description": "Made once per company by Person 1. Both debaters argue only from this.",
-  "type": "object",
-  "required": ["company", "ticker", "metrics", "debt_details", "news"],
-  "properties": {
-    "company": { "type": "string" },
-    "ticker": { "type": "string" },
-    "metrics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name", "value", "source"],
-        "properties": {
-          "name": { "type": "string", "description": "e.g. leverage, interest_coverage, floating_rate_pct, next_maturity_year, liquidity_usd" },
-          "value": { "type": "number" },
-          "source": { "type": "string", "description": "e.g. \"10-K · Note 9, p. 84\"" }
+  "$defs": {
+    "DebtInstrument": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "amount_usd": {
+          "title": "Amount Usd",
+          "type": "number"
+        },
+        "seniority": {
+          "enum": [
+            "senior_secured",
+            "senior_unsecured",
+            "subordinated"
+          ],
+          "title": "Seniority",
+          "type": "string"
+        },
+        "rate_type": {
+          "enum": [
+            "fixed",
+            "floating"
+          ],
+          "title": "Rate Type",
+          "type": "string"
+        },
+        "rate": {
+          "description": "As written, e.g. \"SOFR + 4.25%\"",
+          "title": "Rate",
+          "type": "string"
+        },
+        "maturity_year": {
+          "title": "Maturity Year",
+          "type": "integer"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
         }
-      }
+      },
+      "required": [
+        "name",
+        "amount_usd",
+        "seniority",
+        "rate_type",
+        "rate",
+        "maturity_year",
+        "source_id"
+      ],
+      "title": "DebtInstrument",
+      "type": "object"
     },
-    "debt_details": {
-      "type": "array",
-      "items": { "type": "object" },
-      "description": "Free-form per instrument for now (name, amount, rate, maturity, secured, source). Lock down at hour 0 if needed."
-    },
-    "news": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["headline", "url"],
-        "properties": {
-          "headline": { "type": "string" },
-          "url": { "type": "string" }
+    "Metric": {
+      "properties": {
+        "name": {
+          "description": "Stable key, e.g. leverage, interest_coverage",
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "description": "Display name, e.g. \"Interest coverage\"",
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "x",
+            "pct",
+            "usd",
+            "year"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "formula": {
+          "default": "",
+          "description": "Python-computed working, e.g. \"$310M EBITDA / $163M interest\"",
+          "title": "Formula",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
         }
-      }
+      },
+      "required": [
+        "name",
+        "label",
+        "value",
+        "unit"
+      ],
+      "title": "Metric",
+      "type": "object"
+    },
+    "Source": {
+      "description": "One citable passage. Claims and metrics point here by id, so the\nfact-checker always checks against the real filing text, never text a\ndebater wrote.",
+      "properties": {
+        "id": {
+          "description": "Short stable id, e.g. \"S3\" for filings, \"N1\" for news",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "10-K",
+            "10-Q",
+            "8-K",
+            "news",
+            "other"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "description": "What the citation chip shows, e.g. \"10-Q · Liquidity, p. 31\"",
+          "title": "Label",
+          "type": "string"
+        },
+        "url": {
+          "default": "",
+          "title": "Url",
+          "type": "string"
+        },
+        "excerpt": {
+          "description": "Exact text from the document; what the fact-checker reads",
+          "title": "Excerpt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "excerpt"
+      ],
+      "title": "Source",
+      "type": "object"
     }
-  }
+  },
+  "properties": {
+    "company": {
+      "title": "Company",
+      "type": "string"
+    },
+    "ticker": {
+      "title": "Ticker",
+      "type": "string"
+    },
+    "as_of": {
+      "description": "Fiscal period of the latest filing, e.g. \"FY2025\" or \"Q2 2026\"",
+      "title": "As Of",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/Source"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/Metric"
+      },
+      "title": "Metrics",
+      "type": "array"
+    },
+    "debt": {
+      "items": {
+        "$ref": "#/$defs/DebtInstrument"
+      },
+      "title": "Debt",
+      "type": "array"
+    }
+  },
+  "required": [
+    "company",
+    "ticker",
+    "as_of"
+  ],
+  "title": "FactSheet",
+  "type": "object"
 }

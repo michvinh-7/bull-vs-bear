@@ -1,19 +1,21 @@
 {
   "agreed": [
-    "Leverage is 5.8x and interest coverage is 1.9x.",
-    "The term loan is secured by owned real estate."
+    { "text": "Leverage is 5.8x and 62% of the debt is floating rate.", "claim_ids": ["t1c1", "t2c1"] },
+    { "text": "The term loan is secured by owned real estate.", "claim_ids": ["t1c2"] }
   ],
   "disputed": [
     {
+      "topic": "Rate exposure vs. collateral",
       "bull": "Collateral protects the secured loan even in a downside case.",
-      "bear": "Floating-rate exposure could push coverage toward 1.3x after a 200 bp move."
+      "bear": "Floating-rate exposure could push coverage toward 1.3x after a 200 bp move.",
+      "claim_ids": ["t1c2", "t2c2"]
     }
   ],
   "unsupported": [
-    "The senior loan is covered 1.4x at a 30% haircut on appraised value."
+    { "claim_id": "t4c1", "speaker": "bull", "text": "Senior loan is covered 1.4x at a 30% haircut" }
   ],
   "open_questions": [
-    "What are the most recent appraised values of the owned stores?",
-    "Is any of the floating-rate debt hedged?"
+    { "question": "What are the most recent appraised values of the owned stores?", "where_to_look": "10-K · Properties (Item 2) and the credit agreement exhibit" },
+    { "question": "Is any of the floating-rate debt hedged?", "where_to_look": "10-K · Item 7A, Quantitative and Qualitative Disclosures About Market Risk" }
   ]
 }
