@@ -88,3 +88,21 @@
     cursor: pointer;
   }
 }
+
+/* Speaking waveform (debate side panels) */
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Blinking caret while a line is being spoken */
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}

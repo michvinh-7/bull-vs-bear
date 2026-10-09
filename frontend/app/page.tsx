@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { startDebate } from "@/lib/api";
+import { unlockAudio } from "@/lib/audio";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
 import type { Label } from "@/lib/types";
 
@@ -26,6 +27,7 @@ export default function Home() {
 
   async function go(t: string) {
     if (!t.trim() || starting) return;
+    unlockAudio(); // must run inside the click, before any await
     setStarting(t.trim().toUpperCase());
     try {
       const id = await startDebate(t.trim());
