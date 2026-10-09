@@ -1,0 +1,155 @@
+"""FastAPI app: the producer. Runs the debate and calls every other service.
+
+Endpoints
+  GET  /health                  liveness check for Render
+  GET  /companies               the pre-cached demo companies
+  POST /debates                 start a debate -> {debate_id}
+  GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
+  GET  /debates/{id}/brief      committee brief only
+  WS   /ws/debates/{id}         streams LineMessages; accepts interrupts
+"""
+import asyncio
+import uuid
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+
+from . import agents, config, store, verify, voice
+from .facts import build_fact_sheet
+from .schemas import (
+    CommitteeBrief,
+    Debate,
+    StartDebateRequest,
+    StartDebateResponse,
+)
+
+app = FastAPI(title="Bull vs Bear")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[config.FRONTEND_ORIGIN, "http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DEMO_COMPANIES = [
+    # TODO(Person 1): pick the 3 demo companies and fill in real tickers.
+    {"ticker": "NWRC", "company": "Northwind Retail Corp (sample)"},
+]
+
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.get("/companies")
+def companies():
+    return DEMO_COMPANIES
+
+
+@app.post("/debates", response_model=StartDebateResponse)
+def start_debate(req: StartDebateRequest):
+    debate = Debate(id=uuid.uuid4().hex[:12], ticker=req.ticker.upper())
+    store.save_debate(debate)
+    return StartDebateResponse(debate_id=debate.id)
+
+
+@app.get("/debates/{debate_id}", response_model=Debate)
+def get_debate(debate_id: str):
+    debate = store.load_debate(debate_id)
+    if not debate:
+        raise HTTPException(404, "Debate not found")
+    return debate
+
+
+@app.get("/debates/{debate_id}/brief", response_model=CommitteeBrief)
+def get_brief(debate_id: str):
+    debate = store.load_debate(debate_id)
+    if not debate or not debate.brief:
+        raise HTTPException(404, "Brief not ready")
+    return debate.brief
+
+
+@app.websocket("/ws/debates/{debate_id}")
+async def debate_socket(ws: WebSocket, debate_id: str):
+    """Server -> client messages:
+         {"type": "fact_sheet", "data": FactSheet}
+         {"type": "line",       "data": LineMessage}
+         {"type": "brief",      "data": CommitteeBrief}
+         {"type": "error",      "message": str}
+       Client -> server messages:
+         {"type": "interrupt", "question": str}
+    """
+    await ws.accept()
+    debate = store.load_debate(debate_id)
+    if not debate:
+        await ws.send_json({"type": "error", "message": "Debate not found"})
+        await ws.close()
+        return
+
+    # Finished debates replay straight from storage.
+    if debate.status == "done":
+        await _replay(ws, debate)
+        return
+
+    interrupts: asyncio.Queue[str] = asyncio.Queue()
+    listener = asyncio.create_task(_listen_for_interrupts(ws, interrupts))
+
+    try:
+        debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
+        await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
+
+        next_side = "bull"
+        turn = 1
+        while turn <= config.MAX_TURNS:
+            # An interrupt becomes a moderator turn; the side that was due answers next.
+            question = None if interrupts.empty() else interrupts.get_nowait()
+            speaker = "moderator" if question else next_side
+
+            line = await asyncio.to_thread(
+                agents.generate_turn, debate.fact_sheet, debate.lines, speaker, turn, question
+            )
+            line.claims = await asyncio.to_thread(verify.check_claims, line.claims)
+            if config.VOICE_ENABLED:
+                line.audio_url = await asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, turn)
+
+            debate.lines.append(line)
+            store.save_debate(debate)
+            await ws.send_json({"type": "line", "data": line.model_dump()})
+            if speaker != "moderator":
+                next_side = "bear" if speaker == "bull" else "bull"
+            turn += 1
+
+        debate.brief = await asyncio.to_thread(agents.write_brief, debate.fact_sheet, debate.lines)
+        debate.status = "done"
+        store.save_debate(debate)
+        await ws.send_json({"type": "brief", "data": debate.brief.model_dump()})
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:  # keep the demo alive; log and tell the client
+        debate.status = "error"
+        store.save_debate(debate)
+        await ws.send_json({"type": "error", "message": str(e)})
+    finally:
+        listener.cancel()
+
+
+async def _listen_for_interrupts(ws: WebSocket, queue: asyncio.Queue):
+    try:
+        while True:
+            msg = await ws.receive_json()
+            if msg.get("type") == "interrupt" and msg.get("question"):
+                await queue.put(msg["question"])
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+
+
+async def _replay(ws: WebSocket, debate: Debate):
+    if debate.fact_sheet:
+        await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
+    for line in debate.lines:
+        await ws.send_json({"type": "line", "data": line.model_dump()})
+        await asyncio.sleep(0.5)
+    if debate.brief:
+        await ws.send_json({"type": "brief", "data": debate.brief.model_dump()})

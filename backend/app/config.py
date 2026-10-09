@@ -1,0 +1,29 @@
+"""Reads settings from environment variables (.env locally, dashboard on Render)."""
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+VOICE_ID_BULL = os.getenv("ELEVENLABS_VOICE_BULL", "")
+VOICE_ID_BEAR = os.getenv("ELEVENLABS_VOICE_BEAR", "")
+VOICE_ID_MODERATOR = os.getenv("ELEVENLABS_VOICE_MODERATOR", "")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
+HF_API_TOKEN = os.getenv("HF_API_TOKEN", "")
+
+# SEC requires a descriptive User-Agent with contact info on every request.
+SEC_USER_AGENT = os.getenv("SEC_USER_AGENT", "BullVsBear hackathon contact@example.com")
+
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+
+# Turn voice off while iterating on debate text to save ElevenLabs credits.
+VOICE_ENABLED = os.getenv("VOICE_ENABLED", "false").lower() == "true"
+
+MAX_TURNS = int(os.getenv("MAX_TURNS", "8"))

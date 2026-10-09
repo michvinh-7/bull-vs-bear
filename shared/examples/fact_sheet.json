@@ -1,0 +1,19 @@
+{
+  "company": "Northwind Retail Corp",
+  "ticker": "NWRC",
+  "metrics": [
+    { "name": "leverage", "value": 5.8, "source": "10-K · Note 9, p. 84" },
+    { "name": "interest_coverage", "value": 1.9, "source": "10-K · Income Statement, p. 62" },
+    { "name": "floating_rate_pct", "value": 62, "source": "10-Q · Liquidity, p. 31" },
+    { "name": "next_maturity_year", "value": 2028, "source": "10-K · Note 9, p. 85" },
+    { "name": "liquidity_usd", "value": 410000000, "source": "10-Q · Liquidity, p. 30" }
+  ],
+  "debt_details": [
+    { "name": "Senior secured term loan", "amount_usd": 1200000000, "rate": "SOFR + 4.25%", "maturity": "2028", "secured": true, "source": "10-K · Note 9, p. 84" },
+    { "name": "Senior unsecured notes", "amount_usd": 600000000, "rate": "7.5% fixed", "maturity": "2030", "secured": false, "source": "10-K · Note 9, p. 85" }
+  ],
+  "news": [
+    { "headline": "Northwind to close 40 underperforming stores", "url": "https://example.com/news/1" },
+    { "headline": "Same-store sales fall for third straight quarter", "url": "https://example.com/news/2" }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LineMessage",
+  "description": "One per debate turn, sent over the WebSocket.",
+  "type": "object",
+  "required": ["turn", "speaker", "text", "claims", "audio_url"],
+  "properties": {
+    "turn": { "type": "integer", "minimum": 1 },
+    "speaker": { "enum": ["bull", "bear", "moderator"] },
+    "text": { "type": "string" },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "label", "source", "passage"],
+        "properties": {
+          "text": { "type": "string" },
+          "label": { "enum": ["verified", "contested", "unsupported", "pending"] },
+          "source": { "type": "string" },
+          "passage": { "type": "string" }
+        }
+      }
+    },
+    "audio_url": { "type": "string", "description": "Empty string until voice is generated." }
+  }
+}

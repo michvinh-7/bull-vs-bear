@@ -1,0 +1,19 @@
+{
+  "agreed": [
+    "Leverage is 5.8x and interest coverage is 1.9x.",
+    "The term loan is secured by owned real estate."
+  ],
+  "disputed": [
+    {
+      "bull": "Collateral protects the secured loan even in a downside case.",
+      "bear": "Floating-rate exposure could push coverage toward 1.3x after a 200 bp move."
+    }
+  ],
+  "unsupported": [
+    "The senior loan is covered 1.4x at a 30% haircut on appraised value."
+  ],
+  "open_questions": [
+    "What are the most recent appraised values of the owned stores?",
+    "Is any of the floating-rate debt hedged?"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommitteeBrief",
+  "description": "One per debate, written by the moderator at the end. Never contains a buy/sell verdict.",
+  "type": "object",
+  "required": ["agreed", "disputed", "unsupported", "open_questions"],
+  "properties": {
+    "agreed": { "type": "array", "items": { "type": "string" } },
+    "disputed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["bull", "bear"],
+        "properties": {
+          "bull": { "type": "string" },
+          "bear": { "type": "string" }
+        }
+      }
+    },
+    "unsupported": { "type": "array", "items": { "type": "string" } },
+    "open_questions": { "type": "array", "items": { "type": "string" } }
+  }
+}
