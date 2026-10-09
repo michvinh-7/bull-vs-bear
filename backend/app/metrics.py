@@ -2,6 +2,8 @@
 
 The AI never does math. Every number the debaters quote comes from here.
 Done when every metric matches a hand calculation from the 10-K.
+
+Definitions and formulas:
 """
 
 
