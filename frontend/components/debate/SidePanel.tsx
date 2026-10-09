@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import type { LineMessage, Position, Side } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import Mascot from "./Mascot";
 import { SPEAKER } from "./speakers";
 import Waveform from "./Waveform";
 
@@ -35,8 +36,8 @@ export default function SidePanel({
   return (
     <Card className={cn("gap-4 p-5 transition-shadow duration-300", status === "speaking" && `ring-2 ${s.ring}`)}>
       <div className="flex items-center gap-3">
-        <span className={cn("grid size-10 place-items-center rounded-full font-display font-bold", s.bg, s.text)}>
-          {s.name[0]}
+        <span className={cn("grid size-14 place-items-center rounded-full", s.bg)}>
+          <Mascot side={side} speaking={status === "speaking" && !paused} size={44} />
         </span>
         <div>
           <div className={cn("font-semibold", s.text)}>{s.name}</div>
