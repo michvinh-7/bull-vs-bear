@@ -91,7 +91,7 @@ export default function CompanySearch({ onPick, busy }: { onPick: (ticker: strin
           <ul
             id={listId}
             role="listbox"
-            className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-80 overflow-y-auto rounded-xl border bg-popover p-1 text-left shadow-2xl shadow-black/50"
+            className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-80 overflow-y-auto rounded-xl border bg-popover p-1 text-left shadow-2xl shadow-black/10 dark:shadow-black/50"
           >
             {results.map((c, i) => (
               <li

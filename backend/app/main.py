@@ -4,7 +4,8 @@ Endpoints
   GET  /health                  liveness check for Railway
   GET  /companies               the pre-cached demo companies
   GET  /companies/search?q=     up to 10 companies matching a name or ticker
-  POST /debates                 start a debate -> {debate_id}; 400 empty, 404 unknown ticker
+  GET  /models                  Gemini models the user can pick in Settings, with prices
+  POST /debates                 start a debate -> {debate_id}; 400 empty/unknown model, 404 unknown ticker
   GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
   GET  /debates/{id}/brief      committee brief only
   WS   /ws/debates/{id}         streams the debate; accepts interrupts
@@ -18,7 +19,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import agents, companies, config, store, verify, voice
+from . import agents, companies, config, store, usage, verify, voice
 from .companies import Company
 from .facts import build_fact_sheet
 from .pacing import Pacer
@@ -98,15 +99,41 @@ def search_companies(q: str = Query(..., min_length=1, max_length=50)):
     return companies.search(q)
 
 
+@app.get("/models")
+def list_models():
+    return usage.models_payload()
+
+
+# Users' own Gemini keys, by debate id: memory only, dropped when the debate ends
+# (or after an hour if it never starts). Never saved, logged or returned.
+_user_keys: dict[str, tuple[str, float]] = {}
+KEY_TTL_SECONDS = 3600
+
+
+def _forget_stale_keys() -> None:
+    cutoff = time.monotonic() - KEY_TTL_SECONDS
+    for debate_id in [d for d, (_, t) in _user_keys.items() if t < cutoff]:
+        _user_keys.pop(debate_id, None)
+
+
 @app.post("/debates", response_model=StartDebateResponse)
 def start_debate(req: StartDebateRequest):
     ticker = req.ticker.strip().upper()
     if not ticker:
         raise HTTPException(400, "Ticker is required")
+    model = req.model or config.GEMINI_MODEL
+    if req.model and req.model not in usage.MODELS:
+        raise HTTPException(400, f"Unknown model {req.model}. Choose one of: {', '.join(usage.MODELS)}")
+    key = (req.gemini_api_key or "").strip() or None
+    if key and (len(key) < 20 or len(key) > 200 or any(c.isspace() for c in key)):
+        raise HTTPException(400, "That doesn't look like a Gemini API key")
     if not companies.is_known(ticker):
         raise HTTPException(404, f"No public company with ticker {ticker}")
-    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS)
+    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS, model=model, usage=usage.Usage(model=model))
     store.save_debate(debate)
+    _forget_stale_keys()
+    if key:
+        _user_keys[debate.id] = (key, time.monotonic())
     return StartDebateResponse(debate_id=debate.id)
 
 
@@ -135,6 +162,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
          {"type": "line",       "data": LineMessage}                             (labels + audio ready)
          ... turn_start / line repeat ...
          {"type": "brief",      "data": CommitteeBrief}
+         {"type": "usage",      "data": Usage}       (after positions, each line and the brief)
          {"type": "error",      "message": str}
        Client -> server messages:
          {"type": "interrupt", "question": str}
@@ -166,6 +194,15 @@ async def debate_socket(ws: WebSocket, debate_id: str):
     pacer = Pacer()
     listener = asyncio.create_task(_listen(ws, interrupts, pacer))
 
+    # Count every Gemini call and voice clip for this debate, using the user's key if they gave one.
+    debate.model = debate.model or config.GEMINI_MODEL
+    debate.usage = debate.usage or usage.Usage(model=debate.model)
+    key = _user_keys.get(debate.id, (None, 0))[0]
+    ctx_token = usage.enter(usage.DebateContext(model=debate.model, usage=debate.usage, api_key=key))
+
+    async def send_usage():
+        await ws.send_json({"type": "usage", "data": debate.usage.model_dump()})
+
     async def pace(wake: asyncio.Queue | None = None, at_most: int = 1):
         """Hold until the listener is at most `at_most` lines behind (or a question arrives on `wake`)."""
         if config.PACING:
@@ -179,6 +216,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
         debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
         await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
+        await send_usage()
 
         sheet = debate.fact_sheet
         planned = debate.max_turns + 1  # analyst lines + the halfway question; shown as "Turn x of y"
@@ -203,6 +241,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             debate.lines.append(line)
             store.save_debate(debate)
             await ws.send_json({"type": "line", "data": line.model_dump()})
+            await send_usage()
             pacer.sent(line.turn, line.text)
             return True
 
@@ -284,6 +323,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         debate.brief = await brief
         debate.status = "done"
         store.save_debate(debate)
+        await send_usage()
         await ws.send_json({"type": "brief", "data": debate.brief.model_dump()})
     except WebSocketDisconnect:
         pass
@@ -297,6 +337,8 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             pass  # the client already left
     finally:
         listener.cancel()
+        usage.leave(ctx_token)
+        _user_keys.pop(debate.id, None)  # the user's key is gone once the debate ends
 
 
 async def _fact_check_in_time(claims, sheet):

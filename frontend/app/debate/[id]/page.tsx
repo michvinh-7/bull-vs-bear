@@ -9,12 +9,15 @@ import SidePanel, { type PanelStatus } from "@/components/debate/SidePanel";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Logo from "@/components/Logo";
+import SettingsSheet from "@/components/SettingsSheet";
+import { ThemeToggle } from "@/components/theme";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ClaimBadge from "@/components/ClaimBadge";
 import { USE_MOCK } from "@/lib/api";
-import { formatMetric, metricsMentioned } from "@/lib/format";
+import { findSource, formatMetric, metricsMentioned } from "@/lib/format";
 import { closedReason, MAX_QUESTIONS, serverFinished } from "@/lib/questions";
 import type { Label, Metric, Side } from "@/lib/types";
 import { useDebate } from "@/lib/useDebate";
@@ -22,7 +25,7 @@ import { usePlayback } from "@/lib/usePlayback";
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay } = useDebate(id);
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage } = useDebate(id);
   const play = usePlayback(lines);
   const [question, setQuestion] = useState("");
   const [selected, setSelected] = useState<SelectedClaim | null>(null);
@@ -81,19 +84,25 @@ export default function DebateRoom() {
     <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <Logo />
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {status === "live" && !play.finished && <span className="size-2 animate-pulse rounded-full bg-unsupported" />}
-          <span>
-            {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
-            {maxTurns && turn && !play.finished ? ` · Turn ${turn} of ${maxTurns}` : ""}
-            {play.finished && brief ? " · Debate finished" : ""}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {status === "live" && !play.finished && <span className="size-2 animate-pulse rounded-full bg-unsupported" />}
+            <span>
+              {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
+              {maxTurns && turn && !play.finished ? ` · Turn ${turn} of ${maxTurns}` : ""}
+              {play.finished && brief ? " · Debate finished" : ""}
+            </span>
+          </div>
+          <SettingsSheet current={usage} />
+          <ThemeToggle />
         </div>
       </header>
 
       {/* One swipeable row on phones, a grid from tablet up */}
       <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-5">
-        {factSheet?.metrics.map((m) => <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} />)}
+        {factSheet?.metrics.map((m) => (
+          <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} sources={m.source_ids.map((sid) => findSource(factSheet, sid)?.label).filter(Boolean) as string[]} />
+        ))}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
@@ -170,7 +179,7 @@ export default function DebateRoom() {
               setQuestion("");
             }}
           >
-            <Button type="submit" className="rounded-full bg-unsupported text-black hover:bg-unsupported/90" disabled={!!reason}>
+            <Button type="submit" className="rounded-full bg-unsupported text-background hover:bg-unsupported/90" disabled={!!reason}>
               <Mic /> Interrupt
             </Button>
             <Input
@@ -192,21 +201,32 @@ export default function DebateRoom() {
   );
 }
 
-function MetricCard({ m, cited }: { m: Metric; cited: boolean }) {
-  // TODO(Person 3): Tooltip with the formula + sources ("the AI never does math" proof).
+/** Hover or focus shows Python's working and where the inputs came from. */
+function MetricCard({ m, cited, sources }: { m: Metric; cited: boolean; sources: string[] }) {
   return (
-    <Card
-      className={`min-w-36 shrink-0 snap-start gap-1 px-4 py-3 transition-all duration-500 sm:min-w-0 ${
-        cited ? "-translate-y-0.5 bg-secondary ring-2 ring-foreground/40" : ""
-      }`}
-      title={m.formula}
-    >
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        {m.label}
-        <span className={`font-mono text-[10px] uppercase transition-opacity duration-500 ${cited ? "opacity-100" : "opacity-0"}`}>cited</span>
-      </div>
-      <div className="font-mono text-xl">{formatMetric(m)}</div>
-    </Card>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Card
+          tabIndex={0}
+          className={`min-w-36 shrink-0 cursor-help snap-start gap-1 px-4 py-3 transition-all duration-500 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-0 ${
+            cited ? "-translate-y-0.5 bg-secondary ring-2 ring-foreground/40" : ""
+          }`}
+        >
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            {m.label}
+            <span className={`font-mono text-[10px] uppercase transition-opacity duration-500 ${cited ? "opacity-100" : "opacity-0"}`}>cited</span>
+          </div>
+          <div className="font-mono text-xl">{formatMetric(m)}</div>
+        </Card>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-64">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono">{m.formula || "Computed in Python from the filings"}</span>
+          {sources.length > 0 && <span className="opacity-70">From {sources.join(" · ")}</span>}
+          <span className="opacity-70">Calculated by code, not by the AI.</span>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

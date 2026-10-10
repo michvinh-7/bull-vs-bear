@@ -49,7 +49,7 @@ export default function SidePanel({
         <div className="flex flex-col gap-2">
           <div className="text-xs text-muted-foreground uppercase">Thesis</div>
           <p className="text-sm">{position.thesis}</p>
-          <ul className="mt-1 space-y-1.5 text-sm text-neutral-300">
+          <ul className="mt-1 space-y-1.5 text-sm text-foreground/85">
             {position.points.map((p, i) => (
               <li key={i} className="flex gap-2">
                 <span className={s.text}>{side === "bull" ? "+" : "−"}</span>

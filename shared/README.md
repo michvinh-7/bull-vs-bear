@@ -39,12 +39,24 @@ Server → client, in order:
 {"type": "turn_start", "turn": 1, "speaker": "bull", "max_turns": 8}   ← show "Bull is thinking…"
 {"type": "line",       "data": LineMessage}                            ← labels + audio already attached
 ... turn_start / line repeat ...
+{"type": "usage",      "data": Usage}                                  ← after positions, each line, and before the brief
 {"type": "brief",      "data": CommitteeBrief}
 {"type": "error",      "message": "..."}
 ```
 
-Client → server: `{"type": "interrupt", "question": "..."}`. It becomes the next
-moderator line with `from_user: true`, and the side that was due answers it.
+Client → server:
+- `{"type": "interrupt", "question": "..."}`: becomes the next moderator line with
+  `from_user: true`; the side that was due answers it.
+- `{"type": "played", "turn": 3}` (optional): line 3 finished playing, for pacing.
+
+`Usage` (running totals for the debate; also saved on the debate as `usage`):
+```
+{"model": "gemini-3.6-flash", "calls": 19, "input_tokens": 43151, "output_tokens": 3272,
+ "thinking_tokens": 0, "voice_chars": 0, "cost_usd": 0.0211}      ← cost_usd is null if the price is unknown
+```
+
+Starting a debate: `POST /debates {"ticker": "NWRC", "model": "gemini-3.6-flash", "gemini_api_key": "..."}`.
+`model` must be one of `GET /models` (400 otherwise); both fields are optional. The key is never stored or echoed.
 
 ## v2 changes (proposed for hour 0)
 

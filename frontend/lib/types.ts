@@ -82,6 +82,34 @@ export interface CommitteeBrief {
   open_questions: { question: string; where_to_look: string }[];
 }
 
+// ---- Settings: models and usage ----
+
+export interface ModelOption {
+  id: string;
+  label: string;
+  note: string;
+  input_per_m: number; // USD per 1M input tokens
+  output_per_m: number; // USD per 1M output tokens (thinking included)
+  price_note: string;
+}
+
+export interface ModelsResponse {
+  default: string;
+  prices_checked: string; // date the prices were copied from Google's pricing page
+  models: ModelOption[];
+}
+
+/** Running totals for one debate, from the backend. cost_usd is null when the price isn't known. */
+export interface Usage {
+  model: string;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  thinking_tokens: number;
+  voice_chars: number;
+  cost_usd: number | null;
+}
+
 // ---- API / WebSocket ----
 
 export interface Debate {
@@ -89,6 +117,8 @@ export interface Debate {
   ticker: string;
   status: "running" | "done" | "error";
   max_turns: number;
+  model?: string | null;
+  usage?: Usage | null;
   fact_sheet: FactSheet | null;
   positions: Positions | null;
   lines: LineMessage[];
@@ -101,6 +131,7 @@ export type ServerMessage =
   | { type: "turn_start"; turn: number; speaker: Speaker; max_turns: number }
   | { type: "line"; data: LineMessage }
   | { type: "brief"; data: CommitteeBrief }
+  | { type: "usage"; data: Usage }
   | { type: "error"; message: string };
 
 export type ClientMessage = { type: "interrupt"; question: string };

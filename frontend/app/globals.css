@@ -4,20 +4,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Product colors from the UI mockup: dark surfaces, blue bull, orange bear, violet moderator. */
-@theme {
-  --color-bg: #0d1014;
-  --color-panel: #161a20;
-  --color-line: #262b33;
-  --color-bull: #4f8ff7;
-  --color-bull-bg: #1b2a44;
-  --color-bear: #f0a04b;
-  --color-bear-bg: #3a2a16;
-  --color-mod: #b9a4f5;
-  --color-mod-bg: #1f1d26;
-  --color-verified: #4ade80;
-  --color-contested: #facc15;
-  --color-unsupported: #f87171;
+/* Product colors (bull blue, bear orange, moderator violet, label colors).
+   Values live in :root (light) and .dark below, so every class like text-bear switches with the theme. */
+@theme inline {
+  --color-bg: var(--background);
+  --color-panel: var(--card);
+  --color-line: var(--border);
+  --color-bull: var(--bull);
+  --color-bull-bg: var(--bull-bg);
+  --color-bear: var(--bear);
+  --color-bear-bg: var(--bear-bg);
+  --color-mod: var(--mod);
+  --color-mod-bg: var(--mod-bg);
+  --color-verified: var(--verified);
+  --color-contested: var(--contested);
+  --color-unsupported: var(--unsupported);
 }
 
 /* shadcn tokens, mapped onto the product colors above */
@@ -54,6 +55,39 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+:root {
+  /* Light: darker product colors so small text keeps 4.5:1 contrast on white */
+  --background: #f6f7f9;
+  --foreground: #11151b;
+  --card: #ffffff;
+  --card-foreground: #11151b;
+  --popover: #ffffff;
+  --popover-foreground: #11151b;
+  --primary: #11151b;
+  --primary-foreground: #ffffff;
+  --secondary: #eceef2;
+  --secondary-foreground: #11151b;
+  --muted: #eceef2;
+  --muted-foreground: #586070;
+  --accent: #eceef2;
+  --accent-foreground: #11151b;
+  --destructive: #dc2626;
+  --border: #dfe2e8;
+  --input: #d5d9e0;
+  --ring: #1d5fe0;
+  --radius: 0.625rem;
+
+  --bull: #1d5fe0;
+  --bull-bg: #e4edff;
+  --bear: #a14b06;
+  --bear-bg: #fdf0e1;
+  --mod: #6d4fd1;
+  --mod-bg: #f0ecfb;
+  --verified: #15803d;
+  --contested: #a16207;
+  --unsupported: #dc2626;
+}
+
 .dark {
   --background: #0d1014;
   --foreground: #f5f5f5;
@@ -74,6 +108,16 @@
   --input: #262b33;
   --ring: #4f8ff7;
   --radius: 0.625rem;
+
+  --bull: #4f8ff7;
+  --bull-bg: #1b2a44;
+  --bear: #f0a04b;
+  --bear-bg: #3a2a16;
+  --mod: #b9a4f5;
+  --mod-bg: #1f1d26;
+  --verified: #4ade80;
+  --contested: #facc15;
+  --unsupported: #f87171;
 }
 
 @layer base {

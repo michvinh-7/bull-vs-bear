@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDebate, USE_MOCK, wsUrl } from "./api";
 import { mockDebate } from "./mock";
-import type { CommitteeBrief, FactSheet, LineMessage, Positions, ServerMessage, Speaker } from "./types";
+import { mockModels, mockUsage } from "./mock/models";
+import { addToTotals, getModel } from "./settings";
+import type { CommitteeBrief, FactSheet, LineMessage, Positions, ServerMessage, Speaker, Usage } from "./types";
 
 type Status = "connecting" | "live" | "done" | "error";
 
@@ -26,6 +28,13 @@ export function useDebate(debateId: string) {
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   // Replays stream a finished debate from storage; the server isn't taking questions.
   const [replay, setReplay] = useState(false);
+  const replayRef = useRef(replay);
+  replayRef.current = replay;
+  // Tokens, calls, voice characters and estimated cost so far (sent by the backend).
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const usageRef = useRef<Usage | null>(null);
+  // Mock runs get their own id so each one adds to the browser total.
+  const runId = useRef(debateId === "mock" ? `mock-${Date.now()}` : debateId);
 
   const handle = useCallback(
     (msg: ServerMessage) => {
@@ -45,9 +54,15 @@ export function useDebate(debateId: string) {
           setLines((prev) => [...prev, msg.data]);
           if (msg.data.from_user) setPendingQuestion(null);
           break;
+        case "usage":
+          usageRef.current = msg.data;
+          setUsage(msg.data);
+          break;
         case "brief":
           setBrief(msg.data);
           setStatus("done");
+          // A finished live debate adds to this browser's running total (replays cost nothing).
+          if (usageRef.current && !replayRef.current) addToTotals(runId.current, usageRef.current);
           break;
         case "error":
           setError(msg.message);
@@ -67,13 +82,17 @@ export function useDebate(debateId: string) {
     if (USE_MOCK) {
       setStatus("live");
       const m = mockDebate;
+      const model = getModel() ?? mockModels.default;
       const queue: ServerMessage[] = [
         { type: "fact_sheet", data: m.fact_sheet! },
         { type: "positions", data: m.positions! },
-        ...m.lines.flatMap((data): ServerMessage[] => [
+        { type: "usage", data: mockUsage(model, 0) },
+        ...m.lines.flatMap((data, i): ServerMessage[] => [
           { type: "turn_start", turn: data.turn, speaker: data.speaker, max_turns: m.max_turns },
           { type: "line", data },
+          { type: "usage", data: mockUsage(model, i + 1) },
         ]),
+        { type: "usage", data: mockUsage(model, m.lines.length, true) },
         { type: "brief", data: m.brief! },
       ];
       const timers = queue.map((msg, i) => setTimeout(() => handle(msg), i * 900));
@@ -108,5 +127,5 @@ export function useDebate(debateId: string) {
     [handle],
   );
 
-  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay };
+  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage };
 }
