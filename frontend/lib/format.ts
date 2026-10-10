@@ -16,3 +16,26 @@ export function formatMetric(m: Metric): string {
 export function findSource(sheet: FactSheet | null, id: string | null) {
   return id ? sheet?.sources.find((s) => s.id === id) : undefined;
 }
+
+// Words that mean a line is talking about a metric. Keyed by Metric.name;
+// unknown metrics fall back to their own label.
+const METRIC_WORDS: Record<string, string[]> = {
+  leverage: ["leverage", "debt to ebitda", "debt-to-ebitda", "turns of"],
+  interest_coverage: ["coverage", "interest burden"],
+  floating_rate_pct: ["float", "variable rate", "variable-rate", "rate shock", " bp "],
+  next_maturity_year: ["maturit", "matures", "comes due", "refinanc"],
+  liquidity_usd: ["liquidity", "cash", "revolver", "runway"],
+};
+
+/** Which metrics a line refers to, so their cards can light up while it's spoken. */
+export function metricsMentioned(metrics: Metric[], text: string): Set<string> {
+  const t = ` ${text.toLowerCase()} `;
+  return new Set(
+    metrics
+      .filter((m) => {
+        const words = METRIC_WORDS[m.name] ?? [m.label.toLowerCase()];
+        return words.some((w) => t.includes(w)) || t.includes(formatMetric(m).toLowerCase());
+      })
+      .map((m) => m.name),
+  );
+}

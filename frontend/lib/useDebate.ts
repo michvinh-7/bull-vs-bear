@@ -7,7 +7,7 @@ import type { CommitteeBrief, FactSheet, LineMessage, Positions, ServerMessage, 
 
 type Status = "connecting" | "live" | "done" | "error";
 
-/** Connects to the debate stream (or plays mock data) and plays audio in order. */
+/** Connects to the debate stream (or plays mock data). Playback lives in usePlayback. */
 export function useDebate(debateId: string) {
   const [factSheet, setFactSheet] = useState<FactSheet | null>(null);
   const [positions, setPositions] = useState<Positions | null>(null);
@@ -19,8 +19,11 @@ export function useDebate(debateId: string) {
   const [status, setStatus] = useState<Status>("connecting");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const audio = useAudioQueue();
-  const enqueue = audio.enqueue;
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+  // A question the user just sent, shown right away until the committee's
+  // moderator line for it arrives.
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
 
   const handle = useCallback(
     (msg: ServerMessage) => {
@@ -38,7 +41,7 @@ export function useDebate(debateId: string) {
         case "line":
           setThinking(null);
           setLines((prev) => [...prev, msg.data]);
-          if (msg.data.audio_url) enqueue(msg.data.audio_url);
+          if (msg.data.from_user) setPendingQuestion(null);
           break;
         case "brief":
           setBrief(msg.data);
@@ -50,7 +53,7 @@ export function useDebate(debateId: string) {
           break;
       }
     },
-    [enqueue],
+    [],
   );
 
   useEffect(() => {
@@ -81,49 +84,22 @@ export function useDebate(debateId: string) {
     return () => ws.close();
   }, [debateId, handle]);
 
-  const interrupt = useCallback((question: string) => {
-    if (USE_MOCK) {
-      setLines((prev) => [
-        ...prev,
-        { turn: prev.length + 1, speaker: "moderator", from_user: true, text: question, claims: [], audio_url: "" },
-      ]);
-      return;
-    }
-    wsRef.current?.send(JSON.stringify({ type: "interrupt", question }));
-  }, []);
-
-  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, audio };
-}
-
-/** Plays audio clips one after another. TODO(Person 3): pause/mute controls, preload next clip. */
-function useAudioQueue() {
-  const queue = useRef<string[]>([]);
-  const playing = useRef(false);
-  const [muted, setMuted] = useState(false);
-  const mutedRef = useRef(muted);
-  mutedRef.current = muted;
-
-  const playNext = useCallback(() => {
-    const url = queue.current.shift();
-    if (!url) {
-      playing.current = false;
-      return;
-    }
-    playing.current = true;
-    const el = new Audio(url);
-    el.muted = mutedRef.current;
-    el.onended = playNext;
-    el.onerror = playNext;
-    el.play().catch(playNext);
-  }, []);
-
-  const enqueue = useCallback(
-    (url: string) => {
-      queue.current.push(url);
-      if (!playing.current) playNext();
+  const interrupt = useCallback(
+    (question: string) => {
+      setPendingQuestion(question);
+      if (USE_MOCK) {
+        // Pretend the server relays it as the next moderator line.
+        const turn = linesRef.current.length + 1;
+        setTimeout(
+          () => handle({ type: "line", data: { turn, speaker: "moderator", from_user: true, text: question, claims: [], audio_url: "" } }),
+          1200,
+        );
+        return;
+      }
+      wsRef.current?.send(JSON.stringify({ type: "interrupt", question }));
     },
-    [playNext],
+    [handle],
   );
 
-  return { enqueue, muted, setMuted };
+  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion };
 }

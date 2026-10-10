@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import ClaimBadge from "@/components/ClaimBadge";
+import Mascot from "@/components/debate/Mascot";
 import Logo from "@/components/Logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { startDebate } from "@/lib/api";
+import { unlockAudio } from "@/lib/audio";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
 import type { Label } from "@/lib/types";
 
@@ -26,6 +28,7 @@ export default function Home() {
 
   async function go(t: string) {
     if (!t.trim() || starting) return;
+    unlockAudio(); // must run inside the click, before any await
     setStarting(t.trim().toUpperCase());
     try {
       const id = await startDebate(t.trim());
@@ -183,7 +186,10 @@ function PreviewBubble({ side, text, chips }: { side: "bull" | "bear"; text: str
   const bull = side === "bull";
   return (
     <div className={`max-w-[88%] rounded-lg p-3 ${bull ? "self-start bg-bull-bg" : "self-end bg-bear-bg"}`}>
-      <div className={`text-xs font-semibold uppercase ${bull ? "text-bull" : "text-bear"}`}>{bull ? "Bull" : "Bear"}</div>
+      <div className={`mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase ${bull ? "text-bull" : "text-bear"}`}>
+        <Mascot side={side} size={18} />
+        {bull ? "Bull" : "Bear"}
+      </div>
       <p className="text-sm">{text}</p>
       <div className="mt-2 flex flex-wrap gap-1">
         {chips.map(([label, source], i) => (

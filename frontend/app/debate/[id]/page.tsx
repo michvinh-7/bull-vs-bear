@@ -2,160 +2,254 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Mic, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import Bubble from "@/components/debate/Bubble";
+import SidePanel, { type PanelStatus } from "@/components/debate/SidePanel";
+import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
+import { SPEAKER } from "@/components/debate/speakers";
+import Logo from "@/components/Logo";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import ClaimBadge from "@/components/ClaimBadge";
+import { formatMetric, metricsMentioned } from "@/lib/format";
+import type { Label, Metric, Side } from "@/lib/types";
 import { useDebate } from "@/lib/useDebate";
-import { findSource, formatMetric } from "@/lib/format";
-import type { Claim, FactSheet, LineMessage, Metric, Position, Side, Speaker } from "@/lib/types";
-
-const SPEAKER_STYLE = {
-  bull: { name: "Bull", box: "bg-bull-bg self-start", tag: "text-bull", ring: "ring-bull" },
-  bear: { name: "Bear", box: "bg-bear-bg self-end", tag: "text-bear", ring: "ring-bear" },
-  moderator: { name: "Portfolio manager", box: "bg-mod-bg self-center text-center", tag: "text-mod", ring: "ring-mod" },
-};
+import { usePlayback } from "@/lib/usePlayback";
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt } = useDebate(id);
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion } = useDebate(id);
+  const play = usePlayback(lines);
   const [question, setQuestion] = useState("");
-  const speaking: Speaker | undefined = thinking?.speaker ?? lines.at(-1)?.speaker;
+  const [selected, setSelected] = useState<SelectedClaim | null>(null);
+  const floorRef = useRef<HTMLDivElement>(null);
+  const hint = useLabelHint();
+
+  // The question bubble stays up from "sent" until its moderator line is actually heard.
+  const queuedQuestion = lines.slice(play.shown.length).find((l) => l.from_user)?.text;
+  const waitingQuestion = pendingQuestion ?? queuedQuestion ?? null;
+  const thinkingSpeaker = play.caughtUp && thinking ? thinking.speaker : null;
+
+  function panelStatus(side: Side): PanelStatus {
+    if (play.speaker === side) return "speaking";
+    if (thinkingSpeaker === side) return "thinking";
+    return "waiting";
+  }
+
+  // Keep the newest line in view, unless the user scrolled up to reread.
+  useEffect(() => {
+    const el = floorRef.current;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight;
+  }, [play.shown.length, play.progress, waitingQuestion, thinkingSpeaker]);
+
+  // Always bring the closing card into view when the debate ends.
+  const done = play.finished && !!brief;
+  useEffect(() => {
+    const el = floorRef.current;
+    if (done && el) setTimeout(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }), 100);
+  }, [done]);
+
+  const turn = play.current?.turn ?? play.shown.at(-1)?.turn;
+  // Lines whose labels the audience has already seen (excludes the one being spoken).
+  const heard = play.shown.filter((l) => l !== play.current);
+
+  // Metric cards light up while the line that mentions them is being spoken.
+  const citedMetrics = useMemo(
+    () => (play.current && factSheet ? metricsMentioned(factSheet.metrics, play.current.text) : new Set<string>()),
+    [play.current, factSheet],
+  );
+
+  // The one-time hint goes under the first bubble whose labels are visible.
+  const hintTurn = hint.show ? heard.find((l) => l.claims.length > 0)?.turn : undefined;
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="font-bold">
-          Bull vs Bear
-        </Link>
-        <span className="text-sm text-neutral-400">
-          {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
-          {maxTurns && status === "live" && ` · Turn ${thinking?.turn ?? lines.length} of ${maxTurns}`}
-          {status !== "live" && ` · ${status}`}
-        </span>
+    <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Logo />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {status === "live" && !play.finished && <span className="size-2 animate-pulse rounded-full bg-unsupported" />}
+          <span>
+            {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
+            {maxTurns && turn && !play.finished ? ` · Turn ${turn} of ${maxTurns}` : ""}
+            {play.finished && brief ? " · Debate finished" : ""}
+          </span>
+        </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {factSheet?.metrics.map((m) => <MetricCard key={m.name} m={m} />)}
+      {/* One swipeable row on phones, a grid from tablet up */}
+      <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-5">
+        {factSheet?.metrics.map((m) => <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} />)}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
-        <SidePanel side="bull" position={positions?.bull} lines={lines} active={speaking === "bull"} />
+        <SidePanel side="bull" position={positions?.bull} heard={heard} status={panelStatus("bull")} paused={play.paused} />
 
-        <div className="flex min-h-[28rem] flex-col rounded-xl bg-panel p-4">
-          <h2 className="mb-3 font-semibold">Committee floor</h2>
-          <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
-            {lines.map((l) => (
-              <Line key={l.turn} line={l} sheet={factSheet} />
+        {/* On phones the floor comes first; side panels follow below it */}
+        <Card className="relative order-first gap-0 p-0 lg:order-none">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-3">
+              <h2 className="font-semibold">Committee floor</h2>
+              {play.speaker && (
+                <span className={`flex items-center gap-1.5 text-xs lg:hidden ${SPEAKER[play.speaker].text}`}>
+                  <span className="size-1.5 animate-pulse rounded-full bg-current" />
+                  {SPEAKER[play.speaker].name} speaking
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon" onClick={play.togglePause} aria-label={play.paused ? "Resume" : "Pause"}>
+                {play.paused ? <Play /> : <Pause />}
+              </Button>
+              <Button variant="outline" size="icon" onClick={play.toggleMute} aria-label={play.muted ? "Unmute" : "Mute"}>
+                {play.muted ? <VolumeX /> : <Volume2 />}
+              </Button>
+            </div>
+          </div>
+
+          <div ref={floorRef} className="flex h-[58vh] flex-col gap-3 overflow-y-auto p-4 sm:h-[26rem] lg:h-[30rem]">
+            {play.shown.map((l) => (
+              <Bubble
+                key={l.turn}
+                line={l}
+                sheet={factSheet}
+                active={play.current?.turn === l.turn}
+                progress={play.progress}
+                onClaim={(claim, line) => {
+                  hint.dismiss();
+                  setSelected({ claim, speaker: line.speaker });
+                }}
+                hint={l.turn === hintTurn}
+              />
             ))}
-            {thinking && (
-              <p className={`text-sm italic ${SPEAKER_STYLE[thinking.speaker].tag}`}>
-                {SPEAKER_STYLE[thinking.speaker].name} is thinking…
-              </p>
+            {waitingQuestion && (
+              <div className="max-w-[88%] self-center rounded-lg border border-dashed border-mod/50 bg-mod-bg/60 p-3 text-center text-sm">
+                <div className="text-xs font-semibold text-mod uppercase">You asked</div>
+                {waitingQuestion}
+                <div className="mt-1 text-xs text-muted-foreground">Sent. The committee takes it after this turn.</div>
+              </div>
+            )}
+            {thinkingSpeaker && (
+              <p className={`text-sm italic ${SPEAKER[thinkingSpeaker].text}`}>{SPEAKER[thinkingSpeaker].name} is thinking…</p>
+            )}
+            {play.finished && brief && <ClosingCard heard={heard} briefHref={`/brief/${id}`} />}
+            {play.shown.length === 0 && !play.blocked && (
+              <p className="m-auto text-sm text-muted-foreground">The committee is taking its seats…</p>
             )}
           </div>
+
+          {play.blocked && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/80 backdrop-blur-sm">
+              <Button size="lg" onClick={play.unblock}>
+                <Play /> Play debate
+              </Button>
+              <p className="text-xs text-muted-foreground">Your browser needs a tap before it plays sound.</p>
+            </div>
+          )}
+
           <form
-            className="mt-3 flex gap-2 border-t border-line pt-3"
+            className="flex gap-2 border-t p-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!question.trim()) return;
+              if (!question.trim() || waitingQuestion || done) return;
               interrupt(question.trim());
               setQuestion("");
             }}
           >
-            <button className="rounded-full bg-unsupported px-4 py-2 text-sm font-semibold text-black">
-              Interrupt
-            </button>
-            <input
-              className="flex-1 rounded-full border border-line bg-bg px-4 py-2 text-sm outline-hidden"
-              placeholder="Ask the committee a question…"
+            <Button type="submit" className="rounded-full bg-unsupported text-black hover:bg-unsupported/90" disabled={!!waitingQuestion || done}>
+              <Mic /> Interrupt
+            </Button>
+            <Input
+              className="rounded-full"
+              placeholder={done ? "The debate has ended" : waitingQuestion ? "Waiting for the committee…" : "Ask the committee a question…"}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
+              disabled={!!waitingQuestion || done}
             />
           </form>
-        </div>
+        </Card>
 
-        <SidePanel side="bear" position={positions?.bear} lines={lines} active={speaking === "bear"} />
+        <SidePanel side="bear" position={positions?.bear} heard={heard} status={panelStatus("bear")} paused={play.paused} />
       </section>
 
-      {error && <p className="text-unsupported">{error}</p>}
-      {brief && (
-        <Link href={`/brief/${id}`} className="self-center rounded-lg bg-neutral-100 px-4 py-2 font-semibold text-black">
-          Read the committee brief →
-        </Link>
-      )}
+      {error && <p className="text-sm text-unsupported">{error}</p>}
+      <SourceSheet selected={selected} sheet={factSheet} onClose={() => setSelected(null)} />
     </main>
   );
 }
 
-function MetricCard({ m }: { m: Metric }) {
-  // TODO(Person 3): click to show formula + sources ("the AI never does math" proof).
+function MetricCard({ m, cited }: { m: Metric; cited: boolean }) {
+  // TODO(Person 3): Tooltip with the formula + sources ("the AI never does math" proof).
   return (
-    <div className="rounded-xl bg-panel p-3" title={m.formula}>
-      <div className="text-xs text-neutral-400">{m.label}</div>
-      <div className="font-mono text-xl">{formatMetric(m)}</div>
-    </div>
-  );
-}
-
-function SidePanel({ side, position, lines, active }: { side: Side; position?: Position; lines: LineMessage[]; active: boolean }) {
-  const s = SPEAKER_STYLE[side];
-  // Replaces "points scored": a count of this side's claims the fact-checker verified.
-  const verified = lines.filter((l) => l.speaker === side).flatMap((l) => l.claims).filter((c) => c.label === "verified").length;
-  return (
-    <aside className={`flex flex-col gap-3 rounded-xl bg-panel p-4 ${active ? `ring-2 ${s.ring}` : ""}`}>
-      <div>
-        <div className={`font-semibold ${s.tag}`}>{s.name}</div>
-        <div className="text-sm text-neutral-400">{active ? "Speaking now" : "Waiting"}</div>
+    <Card
+      className={`min-w-36 shrink-0 snap-start gap-1 px-4 py-3 transition-all duration-500 sm:min-w-0 ${
+        cited ? "-translate-y-0.5 bg-secondary ring-2 ring-foreground/40" : ""
+      }`}
+      title={m.formula}
+    >
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        {m.label}
+        <span className={`font-mono text-[10px] uppercase transition-opacity duration-500 ${cited ? "opacity-100" : "opacity-0"}`}>cited</span>
       </div>
-      {position && (
-        <>
-          <div className="text-xs uppercase text-neutral-500">Thesis</div>
-          <p className="text-sm">{position.thesis}</p>
-          <ul className="space-y-1 text-sm text-neutral-300">
-            {position.points.map((p, i) => (
-              <li key={i}>
-                {side === "bull" ? "+" : "−"} {p.text}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      <div className="mt-auto text-xs text-neutral-400">Verified claims · {verified}</div>
-    </aside>
+      <div className="font-mono text-xl">{formatMetric(m)}</div>
+    </Card>
   );
 }
 
-function Line({ line, sheet }: { line: LineMessage; sheet: FactSheet | null }) {
-  const s = SPEAKER_STYLE[line.speaker];
+const TALLY: { label: Label; text: string }[] = [
+  { label: "verified", text: "backed by the filings" },
+  { label: "contested", text: "the source says otherwise" },
+  { label: "unsupported", text: "no source at all" },
+];
+
+/** End-of-debate card: how the evidence held up, then the way into the brief. No verdict. */
+function ClosingCard({ heard, briefHref }: { heard: { claims: { label: Label }[] }[]; briefHref: string }) {
+  const claims = heard.flatMap((l) => l.claims);
   return (
-    <div className={`max-w-[85%] rounded-lg p-3 ${s.box}`}>
-      <div className={`text-xs font-semibold uppercase ${s.tag}`}>{line.from_user ? "You asked" : s.name}</div>
-      <p className="text-sm">{line.text}</p>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {line.claims.map((c) => (
-          <ClaimChip key={c.id} claim={c} sheet={sheet} />
+    <div className="mt-2 flex flex-col items-center gap-4 rounded-xl border bg-background/60 p-5 text-center animate-in fade-in-0 zoom-in-95 duration-500">
+      <div>
+        <div className="font-display text-lg font-bold">The committee has finished</div>
+        <p className="text-sm text-muted-foreground">
+          {claims.length} claims were checked against the source documents.
+        </p>
+      </div>
+      <div className="grid w-full grid-cols-3 gap-2">
+        {TALLY.map(({ label, text }) => (
+          <div key={label} className="flex flex-col items-center gap-1 rounded-lg bg-card p-3">
+            <span className="font-mono text-2xl">{claims.filter((c) => c.label === label).length}</span>
+            <ClaimBadge label={label} />
+            <span className="text-[11px] leading-tight text-muted-foreground">{text}</span>
+          </div>
         ))}
       </div>
+      <Button asChild size="lg">
+        <Link href={briefHref}>Read the committee brief →</Link>
+      </Button>
+      <p className="text-[11px] text-muted-foreground">This summarizes the debate. It is not investment advice.</p>
     </div>
   );
 }
 
-const LABEL_COLOR = {
-  verified: "border-verified text-verified",
-  contested: "border-contested text-contested",
-  unsupported: "border-unsupported text-unsupported",
-  pending: "border-neutral-600 text-neutral-400",
-};
+const HINT_KEY = "bvb-label-hint-seen";
 
-function ClaimChip({ claim, sheet }: { claim: Claim; sheet: FactSheet | null }) {
-  // TODO(Person 3): click opens a drawer with the source excerpt and a link to the filing.
-  const [open, setOpen] = useState(false);
-  const source = findSource(sheet, claim.source_id);
-  return (
-    <button
-      onClick={() => setOpen(!open)}
-      className={`rounded-sm border px-2 py-0.5 text-left font-mono text-xs ${LABEL_COLOR[claim.label]}`}
-    >
-      {claim.label} · {source?.label ?? "no source"}
-      {open && source && <span className="mt-1 block font-sans text-neutral-300">“{source.excerpt}”</span>}
-    </button>
-  );
+/** "Tap a label" hint, shown until the viewer opens a source once (remembered per browser). */
+function useLabelHint() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      setShow(localStorage.getItem(HINT_KEY) !== "1");
+    } catch {
+      setShow(true);
+    }
+  }, []);
+  return {
+    show,
+    dismiss: () => {
+      setShow(false);
+      try {
+        localStorage.setItem(HINT_KEY, "1");
+      } catch {}
+    },
+  };
 }
