@@ -16,6 +16,7 @@ frontend and tests run with no key.
 """
 import json
 import re
+import time
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -465,6 +466,29 @@ def _generate(system: str, user: str, schema: type[BaseModel], temperature: floa
     return json.loads(resp.text)
 
 
+RETRY_WAITS = (1.0, 3.0)  # seconds before each retry of a busy / rate-limited / timed-out call
+_sleep = time.sleep  # tests swap this
+
+
+def is_transient(e: Exception) -> bool:
+    """Worth retrying: rate limits, overload, server errors, timeouts. Not bad keys or bad requests."""
+    if getattr(e, "code", None) in (429, 500, 502, 503, 504):
+        return True
+    text = f"{type(e).__name__} {e}".lower()
+    return any(s in text for s in ("timeout", "timed out", "unavailable", "resource_exhausted", "deadline", "connection"))
+
+
+def _generate_retrying(*args) -> dict:
+    for wait in (*RETRY_WAITS, None):
+        try:
+            return _generate(*args)
+        except Exception as e:
+            if wait is None or not is_transient(e):
+                raise
+            print(f"[agents] Gemini busy ({str(e)[:80]}); retrying in {wait:.0f}s")
+            _sleep(wait)
+
+
 def _call(
     system: str, user: str, schema: type[BaseModel], temperature: float, validate: Callable[[dict], list[str]],
     thinking: str = "minimal",
@@ -475,7 +499,7 @@ def _call(
     prompt, errs = user, []
     for _ in range(MAX_RETRIES + 1):
         try:
-            out = schema.model_validate(_generate(system, prompt, schema, temperature, thinking)).model_dump()
+            out = schema.model_validate(_generate_retrying(system, prompt, schema, temperature, thinking)).model_dump()
             errs = validate(out)
         except (ValueError, ValidationError) as e:  # bad JSON or wrong shape
             errs = [f"output did not match the schema: {str(e)[:200]}"]

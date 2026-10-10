@@ -149,8 +149,8 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             if line is None:  # Gemini broke the rules twice: drop the turn, never show broken data
                 return False
             claims, audio_url = await asyncio.gather(
-                asyncio.to_thread(verify.check_claims, line.claims, sheet),
-                asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, line.turn)
+                asyncio.to_thread(_check_claims, line.claims, sheet),
+                asyncio.to_thread(_speak, line.text, line.speaker, debate.id, line.turn)
                 if config.VOICE_ENABLED
                 else asyncio.sleep(0, result=""),
             )
@@ -243,11 +243,33 @@ async def debate_socket(ws: WebSocket, debate_id: str):
     except WebSocketDisconnect:
         pass
     except Exception as e:  # keep the demo alive; log and tell the client
+        print(f"[debate {debate.id}] stopped: {e}")
         debate.status = "error"
         store.save_debate(debate)
-        await ws.send_json({"type": "error", "message": str(e)})
+        try:
+            await ws.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass  # the client already left
     finally:
         listener.cancel()
+
+
+def _check_claims(claims, sheet):
+    """The fact-checker crashing never stops the debate: the claims stay "pending"."""
+    try:
+        return verify.check_claims(claims, sheet)
+    except Exception as e:
+        print(f"[verify] fact-check failed, labels stay pending: {e}")
+        return claims
+
+
+def _speak(text, speaker, debate_id, turn) -> str:
+    """Voice failing never stops the debate: the line plays as text."""
+    try:
+        return voice.speak(text, speaker, debate_id, turn)
+    except Exception as e:
+        print(f"[voice] failed, line plays as text: {e}")
+        return ""
 
 
 def _other(side: str) -> str:
