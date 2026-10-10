@@ -255,6 +255,11 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             # quietly finishing with no lines.
             api_failures = api_failures + 1 if line is None and agents.last_error else 0
             if api_failures >= 2:
+                if key and agents.key_rejected(agents.last_error):
+                    raise RuntimeError(
+                        f"Your Gemini API key was rejected for {debate.model} ({agents.last_error}). "
+                        "Check it in Settings, or remove it to use the default."
+                    )
                 raise RuntimeError(
                     f"The debate engine is unavailable right now ({agents.last_error}). "
                     "Try again in a minute, or replay a saved debate."
