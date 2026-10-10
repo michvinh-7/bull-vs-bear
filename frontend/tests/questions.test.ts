@@ -1,0 +1,45 @@
+import { describe, expect, it } from "vitest";
+import { closedReason, MAX_QUESTIONS, serverFinished, type QuestionState } from "@/lib/questions";
+
+const open: QuestionState = { replay: false, done: false, serverFinished: false, asked: 0, waiting: false };
+
+describe("closedReason", () => {
+  it("is open by default", () => {
+    expect(closedReason(open)).toBeNull();
+  });
+  it("closes during a replay, whatever else is true", () => {
+    expect(closedReason({ ...open, replay: true, done: true, asked: 9 })).toMatch(/replay/);
+  });
+  it("closes when the debate is done", () => {
+    expect(closedReason({ ...open, done: true, serverFinished: true })).toBe("The debate has ended");
+  });
+  it("closes when the server stopped taking questions", () => {
+    expect(closedReason({ ...open, serverFinished: true })).toMatch(/finished taking questions/);
+  });
+  it("closes at the question limit, not before", () => {
+    expect(closedReason({ ...open, asked: MAX_QUESTIONS - 1 })).toBeNull();
+    expect(closedReason({ ...open, asked: MAX_QUESTIONS })).toMatch(/limit reached/);
+  });
+  it("waits while a question is in flight", () => {
+    expect(closedReason({ ...open, waiting: true })).toMatch(/Waiting/);
+  });
+  it("prefers the limit message over waiting", () => {
+    expect(closedReason({ ...open, waiting: true, asked: MAX_QUESTIONS })).toMatch(/limit reached/);
+  });
+});
+
+describe("serverFinished", () => {
+  it("is true once the brief arrives", () => {
+    expect(serverFinished({ brief: true, lines: 0, maxTurns: null, thinking: false })).toBe(true);
+  });
+  it("is true when every planned line is in and nothing is being written", () => {
+    expect(serverFinished({ brief: false, lines: 9, maxTurns: 9, thinking: false })).toBe(true);
+  });
+  it("is false while a turn is still being written", () => {
+    expect(serverFinished({ brief: false, lines: 9, maxTurns: 9, thinking: true })).toBe(false);
+  });
+  it("is false before the plan is known or while lines are missing", () => {
+    expect(serverFinished({ brief: false, lines: 3, maxTurns: null, thinking: false })).toBe(false);
+    expect(serverFinished({ brief: false, lines: 3, maxTurns: 9, thinking: false })).toBe(false);
+  });
+});

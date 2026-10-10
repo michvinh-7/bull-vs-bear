@@ -5,13 +5,13 @@ from pathlib import Path
 
 from app import metrics
 from app.schemas import CommitteeBrief, FactSheet, LineMessage, Positions
-from scripts.export_schemas import OUT, SHAPES, render
+from scripts.export_schemas import BACKEND_EXAMPLES, OUT, SHAPES, SHARED_EXAMPLES, render
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "shared" / "examples"
 
 
 def load(name):
-    return json.loads((EXAMPLES / name).read_text())
+    return json.loads((EXAMPLES / name).read_text(encoding="utf-8"))
 
 
 def test_examples_match_models():
@@ -48,7 +48,7 @@ def test_example_ids_resolve():
 
 def test_json_schemas_in_sync():
     for name, model in SHAPES.items():
-        on_disk = (OUT / f"{name}.schema.json").read_text()
+        on_disk = (OUT / f"{name}.schema.json").read_text(encoding="utf-8")
         assert on_disk == render(model), f"Run `python -m scripts.export_schemas` ({name} is stale)"
 
 
@@ -58,3 +58,12 @@ def test_metrics_basic():
     assert metrics.floating_rate_pct(62, 100) == 62.0
     assert metrics.liquidity(110, 300) == 410
     assert metrics.next_big_maturity({2026: 5, 2027: 5, 2028: 90}) == 2028
+
+
+def test_backend_examples_match_shared():
+    """Railway ships only backend/, so the backend keeps its own copy of shared/examples."""
+    for src in SHARED_EXAMPLES.glob("*.json"):
+        copy = BACKEND_EXAMPLES / src.name
+        assert copy.exists() and copy.read_bytes() == src.read_bytes(), (
+            f"Run `python -m scripts.export_schemas` (backend/app/examples/{src.name} is stale)"
+        )
