@@ -49,6 +49,12 @@ QUESTION_SENTENCES = (1, 3)
 QUESTION_MAX_WORDS = 55
 HISTORY_LINES = 8
 MAX_RETRIES = 1
+BRIEF_AGREED = (1, 3)
+BRIEF_DISPUTED = (1, 4)
+BRIEF_QUESTIONS = (2, 4)
+BRIEF_ITEM_MAX_WORDS = 30
+TOPIC_MAX_WORDS = 6
+DOCUMENTS = re.compile(r"10-K|10-Q|8-K|proxy|credit agreement|indenture|earnings|exhibit|filing|news", re.IGNORECASE)
 
 VERDICT = re.compile(
     r"\b(buy|buying|sell|selling|go long|go short|short the|shorting|recommend\w*|"
@@ -126,6 +132,29 @@ HARD RULES. Code checks your output; breaking any rule rejects it.
 5. Ask about evidence, not opinion. Never say buy, sell, short, recommend or who won.
 Voice: calm, even, brief.
 """,
+    "brief": f"""\
+You are the MODERATOR writing the committee brief that ends a credit debate
+about a company's DEBT. The brief summarizes the evidence for a human who will
+make the decision. It never makes the decision and never says who won.
+
+Write:
+- "agreed": {BRIEF_AGREED[0]} to {BRIEF_AGREED[1]} facts BOTH sides accepted or never challenged.
+- "disputed": {BRIEF_DISPUTED[0]} to {BRIEF_DISPUTED[1]} points where the sides clashed. "topic" is a short
+  heading (at most {TOPIC_MAX_WORDS} words); "bull" and "bear" state each side's position.
+- "open_questions": {BRIEF_QUESTIONS[0]} to {BRIEF_QUESTIONS[1]} things the reader should check before
+  deciding, each with "where_to_look": the document and section to read, e.g.
+  "10-K · Item 7A, market risk" or one of the source labels in SOURCES.
+
+HARD RULES. Code checks your output; breaking any rule rejects it.
+1. Every "agreed" and "disputed" item lists the claim ids it rests on, from
+   CLAIMS, exactly as written. Never rest an item on a claim labeled "unsupported".
+2. Each "disputed" item cites at least one BULL claim and at least one BEAR claim.
+3. Each "text", "bull", "bear" and "question" is one plain sentence of at most
+   {BRIEF_ITEM_MAX_WORDS} words. Each "question" ends with "?".
+4. Numbers: only ones that appear in the claims you cite (or in SOURCES and
+   METRICS for open questions), written the same way. Never compute one.
+5. Neutral: never say buy, sell, short, recommend, or which side won or is right.
+""",
     "positions": """\
 You prepare the opening positions for a credit committee debate about a
 company's DEBT. Write the BULL case (the debt is a sound credit) and the BEAR
@@ -151,6 +180,16 @@ def _question_schema(claim_ids: list[str]) -> type[BaseModel]:
     cid = Literal[tuple(claim_ids)] if claim_ids else str
     return create_model(
         "Question", text=(str, ...), directed_to=(Literal["bull", "bear"], ...), about_claim_ids=(list[cid], ...)
+    )
+
+
+def _brief_schema(claim_ids: list[str]) -> type[BaseModel]:
+    cid = Literal[tuple(claim_ids)] if claim_ids else str
+    agreed = create_model("BriefAgreed", text=(str, ...), claim_ids=(list[cid], ...))
+    disputed = create_model("BriefDisputed", topic=(str, ...), bull=(str, ...), bear=(str, ...), claim_ids=(list[cid], ...))
+    question = create_model("BriefQuestion", question=(str, ...), where_to_look=(str, ...))
+    return create_model(
+        "Brief", agreed=(list[agreed], ...), disputed=(list[disputed], ...), open_questions=(list[question], ...)
     )
 
 
@@ -327,6 +366,58 @@ def validate_question(out: dict, fact_sheet: FactSheet, history: list[LineMessag
     return errs
 
 
+def validate_brief(out: dict, fact_sheet: FactSheet, lines: list[LineMessage]) -> list[str]:
+    errs: list[str] = []
+    claims = {c.id: (line.speaker, c) for line in lines if line.speaker in ("bull", "bear") for c in line.claims}
+    for key, (lo, hi) in (("agreed", BRIEF_AGREED), ("disputed", BRIEF_DISPUTED), ("open_questions", BRIEF_QUESTIONS)):
+        if not lo <= len(out.get(key, [])) <= hi:
+            errs.append(f'"{key}" has {len(out.get(key, []))} items; must be {lo}-{hi}.')
+
+    def check_text(where: str, text: str, allowed: set[str]) -> None:
+        if len(words(text)) > BRIEF_ITEM_MAX_WORDS or len(sentences(text)) > 1:
+            errs.append(f"{where}: must be one sentence of at most {BRIEF_ITEM_MAX_WORDS} words.")
+        if m := VERDICT.search(text):
+            errs.append(f"{where}: contains a trade call or verdict ('{m.group(0)}').")
+        if stray := numbers(text) - allowed:
+            errs.append(f"{where}: numbers {sorted(stray)} are not in the claims it cites.")
+
+    def cited(where: str, ids: list[str]) -> set[str]:
+        """Numbers the item may use: from its claims and their sources."""
+        if not ids:
+            errs.append(f"{where}: must list the claim ids it rests on.")
+        allowed = set()
+        for cid in ids:
+            if cid not in claims:
+                errs.append(f"{where}: claim id '{cid}' is not in CLAIMS.")
+                continue
+            claim = claims[cid][1]
+            if claim.label == "unsupported":
+                errs.append(f"{where}: rests on {cid}, which is labeled unsupported.")
+            allowed |= numbers(claim.text) | numbers(_number_text(fact_sheet, {claim.source_id} if claim.source_id else set()))
+        return allowed
+
+    for i, a in enumerate(out.get("agreed", []), 1):
+        check_text(f"agreed {i}", a.get("text", ""), cited(f"agreed {i}", a.get("claim_ids", [])))
+    for i, d in enumerate(out.get("disputed", []), 1):
+        ids = d.get("claim_ids", [])
+        allowed = cited(f"disputed {i}", ids)
+        sides = {claims[c][0] for c in ids if c in claims}
+        if sides != {"bull", "bear"}:
+            errs.append(f"disputed {i}: must cite at least one bull claim and one bear claim.")
+        if len(words(d.get("topic", ""))) > TOPIC_MAX_WORDS:
+            errs.append(f"disputed {i}: topic is longer than {TOPIC_MAX_WORDS} words.")
+        check_text(f"disputed {i} bull", d.get("bull", ""), allowed)
+        check_text(f"disputed {i} bear", d.get("bear", ""), allowed)
+    everything = numbers(_number_text(fact_sheet)) | {n for _, c in claims.values() for n in numbers(c.text)}
+    for i, q in enumerate(out.get("open_questions", []), 1):
+        check_text(f"open question {i}", q.get("question", ""), everything)
+        if not q.get("question", "").strip().endswith("?"):
+            errs.append(f'open question {i}: must end with "?".')
+        if not DOCUMENTS.search(q.get("where_to_look", "")):
+            errs.append(f'open question {i}: where_to_look must name a document, e.g. "10-K · Item 7A, market risk".')
+    return errs
+
+
 def validate_positions(out: dict, fact_sheet: FactSheet) -> list[str]:
     errs: list[str] = []
     allowed = numbers(_number_text(fact_sheet))
@@ -352,7 +443,7 @@ _client = None
 last_error: str | None = None  # Google's reason for the latest failed call (never contains the key)
 
 
-def _generate(system: str, user: str, schema: type[BaseModel], temperature: float) -> dict:
+def _generate(system: str, user: str, schema: type[BaseModel], temperature: float, thinking: str = "minimal") -> dict:
     global _client
     from google import genai
     from google.genai import types
@@ -368,14 +459,15 @@ def _generate(system: str, user: str, schema: type[BaseModel], temperature: floa
             temperature=temperature,
             response_mime_type="application/json",
             response_schema=schema,
-            thinking_config=types.ThinkingConfig(thinking_level="minimal"),  # speed: ~1.5 s budget between turns
+            thinking_config=types.ThinkingConfig(thinking_level=thinking),  # minimal for live turns: speed
         ),
     )
     return json.loads(resp.text)
 
 
 def _call(
-    system: str, user: str, schema: type[BaseModel], temperature: float, validate: Callable[[dict], list[str]]
+    system: str, user: str, schema: type[BaseModel], temperature: float, validate: Callable[[dict], list[str]],
+    thinking: str = "minimal",
 ) -> dict | None:
     """One call plus one retry with the errors fed back. None if both fail."""
     global last_error
@@ -383,7 +475,7 @@ def _call(
     prompt, errs = user, []
     for _ in range(MAX_RETRIES + 1):
         try:
-            out = schema.model_validate(_generate(system, prompt, schema, temperature)).model_dump()
+            out = schema.model_validate(_generate(system, prompt, schema, temperature, thinking)).model_dump()
             errs = validate(out)
         except (ValueError, ValidationError) as e:  # bad JSON or wrong shape
             errs = [f"output did not match the schema: {str(e)[:200]}"]
@@ -529,15 +621,42 @@ def unsupported_claims(lines: list[LineMessage]) -> list[UnsupportedClaim]:
 
 
 def write_brief(fact_sheet: FactSheet, lines: list[LineMessage]) -> CommitteeBrief:
-    """TODO(Person 2, task 11): Gemini fills agreed / disputed / open questions,
-    citing claim ids. Python adds the unsupported list."""
-    raw = _example("committee_brief.json")
-    return CommitteeBrief(
-        agreed=[AgreedPoint.model_validate(x) for x in raw["agreed"]],
-        disputed=[DisputedPoint.model_validate(x) for x in raw["disputed"]],
-        open_questions=[OpenQuestion.model_validate(x) for x in raw["open_questions"]],
-        unsupported=unsupported_claims(lines),
+    """Gemini writes agreed / disputed / open questions citing claim ids; code
+    checks them and adds the unsupported list from the fact-checker's labels.
+    If Gemini fails, the brief still has the unsupported list (never the sample,
+    which is about a different company)."""
+    unsupported = unsupported_claims(lines)
+    if not config.GEMINI_API_KEY:
+        raw = _example("committee_brief.json")
+        return CommitteeBrief(
+            agreed=[AgreedPoint.model_validate(x) for x in raw["agreed"]],
+            disputed=[DisputedPoint.model_validate(x) for x in raw["disputed"]],
+            open_questions=[OpenQuestion.model_validate(x) for x in raw["open_questions"]],
+            unsupported=unsupported,
+        )
+    claims = [(line.speaker, c) for line in lines if line.speaker in ("bull", "bear") for c in line.claims]
+    if not claims:
+        return CommitteeBrief(unsupported=unsupported)
+    context = {
+        "COMPANY": f"{fact_sheet.company} ({fact_sheet.ticker}), figures as of {fact_sheet.as_of}",
+        "SOURCES": [{"id": s.id, "label": s.label} for s in fact_sheet.sources],
+        "METRICS": _facts(fact_sheet)["METRICS"],
+        "TRANSCRIPT": [
+            {"speaker": "user" if l.from_user else l.speaker, "text": l.text} for l in lines
+        ],
+        "CLAIMS": [
+            {"id": c.id, "speaker": s, "text": c.text, "label": c.label,
+             "source": (fact_sheet.source(c.source_id).label if fact_sheet.source(c.source_id) else None)}
+            for s, c in claims
+        ],
+    }
+    out = _call(
+        SYSTEM_PROMPTS["brief"], json.dumps(context, indent=1), _brief_schema([c.id for _, c in claims]), 0.3,
+        lambda o: validate_brief(o, fact_sheet, lines), thinking="low",
     )
+    if out is None:
+        return CommitteeBrief(unsupported=unsupported)
+    return CommitteeBrief(**out, unsupported=unsupported)
 
 # ---- Stubs for running without a Gemini key ----
 
