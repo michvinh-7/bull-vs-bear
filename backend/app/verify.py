@@ -12,6 +12,7 @@ Uses an NLI model (MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli) with
 """
 from functools import lru_cache
 
+from .agents import _number_text, numbers, show_metric
 from .schemas import Claim, FactSheet
 
 # Runs locally (hosted inference needs paid credits).
@@ -54,9 +55,23 @@ def check_claim(claim: Claim, fact_sheet: FactSheet) -> Claim:
         claim.source_id = None
         claim.label = "unsupported"
         return claim
-    # premise = the filing excerpt, hypothesis = what the debater said.
+    # premise = the filing excerpt, hypothesis = what the debater said. Excerpts say "we" and
+    # "the company", so the premise names the company or the model can't tie a claim about
+    # Verizon to them. Metrics computed from this source are added too: the model can't
+    # work out "13.6x leverage" from the debt and EBITDA figures on its own.
     # Errors are raised, not hidden: main.py catches them and leaves labels "pending".
-    claim.label = LABELS[nli(source.excerpt, claim.text)]
+    computed = [
+        f"{m.label} was {show_metric(m.value, m.unit)} ({m.formula})."
+        for m in fact_sheet.metrics
+        if source.id in m.source_ids
+    ]
+    premise = " ".join([f"From {fact_sheet.company}'s filing: {source.excerpt}"] + computed)
+    claim.label = LABELS[nli(premise, claim.text)]
+    # The model is weak with numbers ("Leverage is 5.8x" passed against a sentence with no
+    # 5.8 in it), so a claim can only be verified if its numbers are in the cited source
+    # or a metric computed from it.
+    if claim.label == "verified" and not numbers(claim.text) <= numbers(_number_text(fact_sheet, {source.id})):
+        claim.label = "unsupported"
     return claim
 
 
