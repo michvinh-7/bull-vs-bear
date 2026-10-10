@@ -28,6 +28,9 @@ VOICE_ENABLED = os.getenv("VOICE_ENABLED", "false").lower() == "true"
 
 MAX_TURNS = int(os.getenv("MAX_TURNS", "8"))  # bull + bear lines, not counting moderator or interrupts
 
+# Longest a line waits for fact-check labels before going out with "pending".
+FACT_CHECK_TIMEOUT = float(os.getenv("FACT_CHECK_TIMEOUT", "8"))
+
 # Keep the debate one line ahead of playback (off = generate as fast as possible, for tests/scripts).
 PACING = os.getenv("PACING", "true").lower() == "true"
 
