@@ -2,10 +2,10 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "watchPatterns": ["/backend/**", "/shared/**", "/requirements.txt", "/.python-version"]
+    "watchPatterns": ["/backend/**"]
   },
   "deploy": {
-    "startCommand": "uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT",
+    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
     "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE"
   }

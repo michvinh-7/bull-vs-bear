@@ -35,7 +35,7 @@ from .schemas import (
     UnsupportedClaim,
 )
 
-EXAMPLES = Path(__file__).resolve().parents[2] / "shared" / "examples"
+EXAMPLES = Path(__file__).resolve().parent / "examples"  # copy of shared/examples, so Railway (root backend/) has it
 
 # ---- Operational definitions: the numbers every rule is checked against ----
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .schemas import FactSheet
 
-EXAMPLE = Path(__file__).resolve().parents[2] / "shared" / "examples" / "fact_sheet.json"
+EXAMPLE = Path(__file__).resolve().parent / "examples" / "fact_sheet.json"  # copy of shared/examples
 
 
 def build_fact_sheet(ticker: str) -> FactSheet:

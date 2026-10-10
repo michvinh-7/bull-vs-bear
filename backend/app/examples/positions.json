@@ -1,0 +1,18 @@
+{
+  "bull": {
+    "thesis": "Senior secured loans are well covered by real estate and inventory. Recovery in a downside case stays high.",
+    "points": [
+      { "text": "Term loan secured by owned stores and distribution centers", "source_id": "S1" },
+      { "text": "No maturities until 2028", "source_id": "S2" },
+      { "text": "Store closures cut fixed costs", "source_id": "N1" }
+    ]
+  },
+  "bear": {
+    "thesis": "Floating-rate exposure and thin coverage leave no room for a slowdown, especially for the unsecured notes.",
+    "points": [
+      { "text": "Same-store sales down three quarters", "source_id": "N2" },
+      { "text": "62% of debt floats with coverage under 2x", "source_id": "S3" },
+      { "text": "Revolver 70% drawn", "source_id": "S4" }
+    ]
+  }
+}
