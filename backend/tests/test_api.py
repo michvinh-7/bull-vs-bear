@@ -121,12 +121,19 @@ def test_cors_allows_the_frontend_sites(client, origin, allowed):
 def test_saved_fact_sheet_is_used_instead_of_rebuilding(client, monkeypatch):
     import json as _json
     from pathlib import Path
-    from app import main
+    from app import edgar, facts
     from app.schemas import FactSheet
     sheet = FactSheet.model_validate(_json.loads(
         (Path(__file__).resolve().parents[2] / "shared" / "examples" / "fact_sheet.json").read_text(encoding="utf-8")))
-    monkeypatch.setattr(store, "_fact_sheets", {"NWRC": sheet})
-    monkeypatch.setattr(main, "build_fact_sheet", lambda t: (_ for _ in ()).throw(AssertionError("rebuilt")))
-    store.save_debate(Debate(id="c1", ticker="NWRC", max_turns=2))
+    sheet = sheet.model_copy(update={"ticker": "VZ"})
+    # VZ's latest 10-K was already built: only the quick "is there a newer 10-K?" check runs
+    monkeypatch.setattr(edgar, "get_cik", lambda t: "0000732712")
+    monkeypatch.setattr(edgar, "latest_filing", lambda cik: ("0001", "https://sec.gov/10k"))
+    monkeypatch.setattr(edgar, "get_company_facts", lambda cik: (_ for _ in ()).throw(AssertionError("rebuilt")))
+    monkeypatch.setattr(store, "_cache", {
+        f"VZ|filing|0001|{facts.CODE_VERSION}": {"sheet": sheet.model_dump(), "built_at": "2026-10-10T12:00:00+00:00"},
+    })
+    store.save_debate(Debate(id="c1", ticker="VZ", max_turns=2))
     with client.websocket_connect("/ws/debates/c1") as ws:
-        assert ws.receive_json()["type"] == "fact_sheet"
+        msg = ws.receive_json()
+        assert msg["type"] == "fact_sheet" and msg["data"]["ticker"] == "VZ"

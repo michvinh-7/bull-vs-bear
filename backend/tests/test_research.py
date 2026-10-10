@@ -166,3 +166,39 @@ def test_gemini_failing_still_gives_a_fact_sheet(monkeypatch):
     monkeypatch.setattr(research, "news_items", down)
     sheet = facts.build_fact_sheet("VZ")
     assert sheet.metrics and sheet.debt == [] and not any(s.kind == "news" for s in sheet.sources)
+
+
+def test_research_uses_the_debates_key_and_counts_its_calls(monkeypatch):
+    """A user's own Gemini key (Settings) is used for the debt and news steps too, and those
+    calls show up in their usage, even the news call made in a worker thread."""
+    from app import agents, usage
+    from app.usage import DebateContext, Usage
+
+    used = []
+
+    class FakeModels:
+        def generate_content(self, model, contents, config):
+            used.append((usage.current().api_key, model))
+            meta = SimpleNamespace(prompt_token_count=1000, candidates_token_count=100, thoughts_token_count=0)
+            return SimpleNamespace(text='{"instruments": []}', candidates=[], usage_metadata=meta, model_version=model)
+
+    monkeypatch.setattr(agents, "_client_for", lambda ctx: SimpleNamespace(models=FakeModels()))
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")  # no server key: only the user's
+    monkeypatch.setattr(store, "_client", None)
+    monkeypatch.setattr(store, "_cache", {})
+    monkeypatch.setattr(edgar, "get_cik", lambda t: "1")
+    monkeypatch.setattr(edgar, "latest_filing", lambda cik: ("0001", "https://sec.gov/10k"))
+    monkeypatch.setattr(edgar, "get_company_facts", lambda cik: {"entityName": "VERIZON"})
+    monkeypatch.setattr(edgar, "get_filing_text", lambda url: "[page 1]\ntext")
+    monkeypatch.setattr(edgar, "pull_fields", lambda f, t: {
+        "fiscal_year_end": "2025-12-31", "tags": {}, "excerpts": {},
+        "fields": {"net_income": 1e9, "income_taxes": None, "interest_expense": 1e8, "depreciation_amortization": 2e8,
+                   "ebit": 1.2e9, "cash": 5e8, "total_debt": 2e9, "undrawn_revolver": None, "maturities": {},
+                   "maturities_after_year_five": None, "floating_debt": None}})
+    monkeypatch.setattr(edgar, "fiscal_year_end", lambda f: "2025-12-31")
+
+    ctx = DebateContext(model="gemini-3.6-flash", usage=Usage(model="gemini-3.6-flash"), api_key="users-own-key")
+    with usage.debate_context(ctx):
+        facts.build_fact_sheet("VZ")
+    assert sorted(used) == [("users-own-key", "gemini-3.6-flash")] * 2  # debt + news
+    assert ctx.usage.calls == 2 and ctx.usage.input_tokens == 2000

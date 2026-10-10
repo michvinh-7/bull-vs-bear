@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from . import config, filing
+from . import agents, config, filing, usage
 
 _SCALES = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
 _FLOATING = re.compile(r"SOFR|LIBOR|EURIBOR|SONIA|base rate|prime|floating|variable", re.I)
@@ -23,19 +23,21 @@ _FLOATING = re.compile(r"SOFR|LIBOR|EURIBOR|SONIA|base rate|prime|floating|varia
 # term loan row says "10.731%")
 _BANK_LOAN = re.compile(r"term loan|credit facilit|credit agreement|revolv", re.I)
 
-_client = None
-
-
-def _gemini():
-    global _client
-    from google import genai
+def _generate(contents: str, **settings):
+    """One Gemini call with the debate's key and model (the user's own from Settings, else the
+    server's), counted in the debate's usage like every other call."""
     from google.genai import types
 
-    if _client is None:
-        # longer than the debate's 20 s: a search or a 30-page read takes a while, and it's
-        # done once per company before the debate starts
-        _client = genai.Client(api_key=config.GEMINI_API_KEY, http_options=types.HttpOptions(timeout=90_000))
-    return _client, types
+    ctx = usage.current()
+    resp = agents._client_for(ctx).models.generate_content(
+        model=ctx.model if ctx else config.GEMINI_MODEL,
+        contents=contents,
+        # longer than a debate turn's 20 s: a search or a 30-page read takes a while, and
+        # it's done once per company before the debate starts
+        config=types.GenerateContentConfig(http_options=types.HttpOptions(timeout=90_000), **settings),
+    )
+    usage.record_gemini(resp)
+    return resp
 
 
 # ---- debt instruments ----
@@ -172,15 +174,11 @@ def check_instrument(raw: dict, text: str, fiscal_year: int) -> tuple[dict, str,
 
 def debt_instruments(text: str, company: str, fiscal_year: int) -> list[tuple[dict, str, str | None]]:
     """[(DebtInstrument fields minus source_id, quote, page)], largest first."""
-    client, types = _gemini()
-    resp = client.models.generate_content(
-        model=config.GEMINI_MODEL,
-        contents=DEBT_PROMPT.format(company=company, fiscal_year=fiscal_year, pages=_debt_pages(text)),
-        config=types.GenerateContentConfig(
-            temperature=0,
-            response_mime_type="application/json",
-            response_schema=_Instruments,
-        ),
+    resp = _generate(
+        DEBT_PROMPT.format(company=company, fiscal_year=fiscal_year, pages=_debt_pages(text)),
+        temperature=0,
+        response_mime_type="application/json",
+        response_schema=_Instruments,
     )
     out, seen = [], set()
     for raw in _Instruments.model_validate_json(resp.text).model_dump()["instruments"]:
@@ -221,11 +219,12 @@ def _news_date(sentence: str) -> str | None:
 def news_items(company: str, ticker: str, today: date | None = None, limit: int = 4) -> list[dict]:
     """[{"label", "url", "excerpt"}] for recent news, each tied to a search result."""
     today = today or date.today()
-    client, types = _gemini()
-    resp = client.models.generate_content(
-        model=config.GEMINI_MODEL,
-        contents=NEWS_PROMPT.format(today=f"{today:%B} {today.day}, {today.year}", company=company, ticker=ticker),
-        config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())], temperature=0.2),
+    from google.genai import types
+
+    resp = _generate(
+        NEWS_PROMPT.format(today=f"{today:%B} {today.day}, {today.year}", company=company, ticker=ticker),
+        tools=[types.Tool(google_search=types.GoogleSearch())],
+        temperature=0.2,
     )
     grounding = resp.candidates[0].grounding_metadata if resp.candidates else None
     if not grounding or not grounding.grounding_supports:

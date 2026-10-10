@@ -3,6 +3,7 @@
 EDGAR numbers + metrics + Gemini-grounded news -> one FactSheet with sources.
 Both debaters argue only from this.
 """
+import contextvars
 import hashlib
 import json
 import re
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import httpx
 
-from . import companies, config, edgar, metrics, research, store
+from . import agents, companies, edgar, metrics, research, store
 from .agents import money
 from .schemas import DebtInstrument, FactSheet, Metric, Source
 
@@ -90,11 +91,13 @@ def _build(ticker: str, cik: str, url: str, key: str, notices: list[str]) -> tup
     company = _company_name(ticker, facts)
     news_notices: list[str] = []
     with ThreadPoolExecutor(2) as pool:
-        news = pool.submit(_news, company, ticker, news_notices)  # a search takes a while; start it now
+        # a search takes a while; start it now. copy_context: the worker thread has to know
+        # whose debate this is, to use their Gemini key and count the call in their usage
+        news = pool.submit(contextvars.copy_context().run, _news, company, ticker, news_notices)
         text = edgar.get_filing_text(url)
         sheet = fact_sheet_from(ticker, facts, edgar.pull_fields(facts, text), url)
         debt, debt_ok = [], True
-        if config.GEMINI_API_KEY:
+        if agents.has_key():
             fiscal_year = date.fromisoformat(edgar.fiscal_year_end(facts)).year
             try:
                 debt = research.debt_instruments(text, company, fiscal_year)
@@ -122,7 +125,7 @@ def _news(company: str, ticker: str, notices: list[str]) -> list[dict]:
     key = f"{ticker}|news"
     cached = store.load_cached(key)
     fresh = cached and _now() - datetime.fromisoformat(cached["fetched_at"]) < NEWS_MAX_AGE
-    if fresh or not config.GEMINI_API_KEY:
+    if fresh or not agents.has_key():
         return cached["items"] if cached else []
     try:
         items = research.news_items(company, ticker)
