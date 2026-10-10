@@ -89,6 +89,12 @@ async def debate_socket(ws: WebSocket, debate_id: str):
          {"type": "error",      "message": str}
        Client -> server messages:
          {"type": "interrupt", "question": str}
+
+    Order of lines: bull and bear alternate for max_turns lines. Halfway, the
+    moderator cross-examines one side; that side answers and the other
+    rebuts. A user interrupt is relayed by the moderator ("You asked"), the
+    side that was due answers it, the other side responds, then the debate
+    resumes. Each interrupt adds 3 lines; at most MAX_INTERRUPTS per debate.
     """
     await ws.accept()
     debate = store.load_debate(debate_id)
@@ -111,34 +117,63 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
         await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
 
-        next_side = "bull"
-        turn = 1
-        while turn <= debate.max_turns:
-            # An interrupt becomes a moderator turn; the side that was due answers next.
-            question = None if interrupts.empty() else interrupts.get_nowait()
-            speaker = "moderator" if question else next_side
-            await ws.send_json(
-                {"type": "turn_start", "turn": turn, "speaker": speaker, "max_turns": debate.max_turns}
-            )
+        sheet = debate.fact_sheet
+        planned = debate.max_turns + 1  # analyst lines + the halfway question; shown as "Turn x of y"
+        interrupts_used = 0
 
-            line = await asyncio.to_thread(
-                agents.generate_turn, debate.fact_sheet, debate.lines, speaker, turn, question
-            )
-            # Fact-check and voice in parallel, then send the line complete.
+        async def start(speaker: str) -> int:
+            turn = len(debate.lines) + 1
+            await ws.send_json({"type": "turn_start", "turn": turn, "speaker": speaker, "max_turns": planned})
+            return turn
+
+        async def emit(line) -> bool:
+            """Fact-check and voice in parallel, save, then send the line complete."""
+            if line is None:  # Gemini broke the rules twice: drop the turn, never show broken data
+                return False
             claims, audio_url = await asyncio.gather(
-                asyncio.to_thread(verify.check_claims, line.claims, debate.fact_sheet),
-                asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, turn)
+                asyncio.to_thread(verify.check_claims, line.claims, sheet),
+                asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, line.turn)
                 if config.VOICE_ENABLED
                 else asyncio.sleep(0, result=""),
             )
             line.claims, line.audio_url = claims, audio_url
-
             debate.lines.append(line)
             store.save_debate(debate)
             await ws.send_json({"type": "line", "data": line.model_dump()})
-            if speaker != "moderator":
-                next_side = "bear" if speaker == "bull" else "bull"
-            turn += 1
+            return True
+
+        async def analyst(side: str, question: str | None = None, target="auto") -> bool:
+            turn = await start(side)
+            return await emit(await asyncio.to_thread(agents.generate_turn, sheet, debate.lines, side, turn, question, target))
+
+        next_side, spoken, cross_examined = "bull", 0, False
+        redos = 2  # a dropped turn gets a fresh try, so one side doesn't speak twice in a row
+        while spoken < debate.max_turns:
+            if not interrupts.empty():
+                question = interrupts.get_nowait()
+                if interrupts_used < config.MAX_INTERRUPTS:
+                    interrupts_used += 1
+                    planned += 3
+                    await emit(agents.relay_question(question, await start("moderator")))
+                    await analyst(next_side, question, target=None)  # answers the user, nothing to rebut
+                    await analyst(_other(next_side), question)  # answers too, and engages the first answer
+                continue
+
+            if spoken == debate.max_turns // 2 and not cross_examined:
+                cross_examined = True
+                asked = await asyncio.to_thread(agents.cross_examine, sheet, debate.lines, await start("moderator"))
+                if asked:
+                    line, side, about = asked
+                    await emit(line)
+                    await analyst(side, line.text, about)  # defends or rebuts the claim the question is about
+                    next_side, spoken = _other(side), spoken + 1
+                    continue
+                planned -= 1  # moderator dropped: no extra line after all
+
+            if not await analyst(next_side) and redos:
+                redos -= 1
+                continue
+            next_side, spoken = _other(next_side), spoken + 1
 
         debate.brief = await asyncio.to_thread(agents.write_brief, debate.fact_sheet, debate.lines)
         debate.status = "done"
@@ -152,6 +187,10 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         await ws.send_json({"type": "error", "message": str(e)})
     finally:
         listener.cancel()
+
+
+def _other(side: str) -> str:
+    return "bear" if side == "bull" else "bull"
 
 
 async def _listen_for_interrupts(ws: WebSocket, queue: asyncio.Queue):
