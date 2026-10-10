@@ -49,13 +49,11 @@ def load_debate(debate_id: str) -> Debate | None:
     return None
 
 
-def save_fact_sheet(sheet: FactSheet, key: str | None = None) -> None:
-    """`key` defaults to the ticker; facts.py adds a version so old sheets aren't reused."""
-    key = key or sheet.ticker
-    _fact_sheets[key] = sheet
+def save_fact_sheet(sheet: FactSheet) -> None:
+    _fact_sheets[sheet.ticker] = sheet
     if _client:
         _safe("save fact sheet", lambda: _client.table("fact_sheets").upsert(
-            {"ticker": key, "data": sheet.model_dump()}
+            {"ticker": sheet.ticker, "data": sheet.model_dump()}
         ).execute())
 
 
@@ -67,6 +65,42 @@ def load_fact_sheet(ticker: str) -> FactSheet | None:
         if result and result.data:
             return FactSheet.model_validate(result.data[0]["data"])
     return None
+
+
+# ---- Cache for facts.py: any JSON under a key, in the same fact_sheets table ----
+# facts.py keeps a fact sheet in parts that go stale at different times (the 10-K part
+# when a new 10-K is filed, the news after a few hours), so it needs more than one row
+# per company.
+
+_cache: dict[str, dict] = {}
+
+
+def save_cached(key: str, data: dict) -> None:
+    _cache[key] = data
+    if _client:
+        _safe("save cache", lambda: _client.table("fact_sheets").upsert({"ticker": key, "data": data}).execute())
+
+
+def load_cached(key: str) -> dict | None:
+    if key in _cache:
+        return _cache[key]
+    if _client:
+        result = _safe("load cache", lambda: _client.table("fact_sheets").select("data").eq("ticker", key).execute())
+        if result and result.data:
+            _cache[key] = result.data[0]["data"]
+            return _cache[key]
+    return None
+
+
+def delete_cached(prefix: str, keep: str | None = None) -> None:
+    """Deletes every key starting with `prefix`, except `keep`."""
+    for key in [k for k in _cache if k.startswith(prefix) and k != keep]:
+        del _cache[key]
+    if _client:
+        def delete():
+            query = _client.table("fact_sheets").delete().like("ticker", prefix.replace("%", r"\%").replace("_", r"\_") + "%")
+            return (query.neq("ticker", keep) if keep else query).execute()
+        _safe("delete cache", delete)
 
 
 def upload_audio(data: bytes, path: str) -> str:

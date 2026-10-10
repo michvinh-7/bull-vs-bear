@@ -91,6 +91,13 @@ export default function DebateRoom() {
         </div>
       </header>
 
+      {/* Part of the data couldn't be fetched: older news, no debt table, EDGAR down */}
+      {factSheet?.notices?.map((n) => (
+        <p key={n} role="status" className="rounded-md border border-contested/40 bg-contested/10 px-3 py-2 text-sm">
+          {n}
+        </p>
+      ))}
+
       {/* One swipeable row on phones, a grid from tablet up */}
       <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-5">
         {factSheet?.metrics.map((m) => <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} />)}

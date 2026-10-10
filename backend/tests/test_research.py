@@ -122,7 +122,7 @@ def test_news_uses_the_whole_line_behind_each_grounded_piece():
     ]
 
 
-def test_add_research_cites_quotes_and_news():
+def test_debt_and_news_become_sources():
     pulled = {
         "fiscal_year_end": "2025-12-31", "tags": {},
         "fields": {"net_income": 1e9, "income_taxes": None, "interest_expense": 1e8, "depreciation_amortization": 2e8,
@@ -134,7 +134,7 @@ def test_add_research_cites_quotes_and_news():
     fields, quote, _ = research.check_instrument(row(), FILING, 2025)
     news = [{"label": "spglobal.com · 2026-07-28", "url": "https://x", "excerpt": "S&P raised AMC to B-, citing $51 million of savings."},
             {"label": "x.com", "url": "https://y", "excerpt": "AMC said attendance was strong."}]
-    sheet = facts.add_research(sheet, [(fields, quote, "98"), (fields, quote, "98")], news, "https://sec.gov/10k")
+    sheet = facts.add_news(facts.add_debt(sheet, [(fields, quote, "98"), (fields, quote, "98")], "https://sec.gov/10k"), news)
     assert [(s.id, s.kind, s.label) for s in sheet.sources] == [
         ("S1", "10-K", "10-K · Financial statements"),
         ("S2", "10-K", "10-K · p. 98"),
@@ -152,11 +152,11 @@ def test_gemini_failing_still_gives_a_fact_sheet(monkeypatch):
                          "maturities_after_year_five": None, "floating_debt": 4.2e8}}
     monkeypatch.setattr(config, "GEMINI_API_KEY", "fake")
     monkeypatch.setattr(store, "_client", None)
-    monkeypatch.setattr(store, "_fact_sheets", {})
+    monkeypatch.setattr(store, "_cache", {})
     monkeypatch.setattr(edgar, "get_cik", lambda t: "1")
     monkeypatch.setattr(edgar, "get_company_facts", lambda cik: {"entityName": "VERIZON"})
-    monkeypatch.setattr(edgar, "latest_filing_url", lambda cik: "https://sec.gov/10k")
-    monkeypatch.setattr(edgar, "get_latest_filing_text", lambda cik: "[page 1]\ntext")
+    monkeypatch.setattr(edgar, "latest_filing", lambda cik: ("0001", "https://sec.gov/10k"))
+    monkeypatch.setattr(edgar, "get_filing_text", lambda url: "[page 1]\ntext")
     monkeypatch.setattr(edgar, "pull_fields", lambda f, t: pulled)
     monkeypatch.setattr(edgar, "fiscal_year_end", lambda f: "2025-12-31")
 

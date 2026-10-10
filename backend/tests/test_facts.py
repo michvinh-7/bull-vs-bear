@@ -1,11 +1,13 @@
 """Guards the fact sheet builder: pulled EDGAR numbers become sources and metrics,
 missing inputs skip a metric instead of inventing one, and an EDGAR outage is told
 to the user instead of crashing. Uses fake pull_fields output, so no network."""
+from datetime import timedelta
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app import agents, config, edgar, facts, main, store
+from app import agents, config, edgar, facts, main, research, store
 from app.filing import Excerpt
 from app.schemas import Debate
 
@@ -98,25 +100,157 @@ def test_sample_company_needs_no_network(monkeypatch):
     assert facts.build_fact_sheet("nwrc").company == "Northwind Retail Corp"
 
 
-def test_cached_sheet_skips_edgar(monkeypatch):
-    sheet = facts.fact_sheet_from("VZ", FACTS, pulled(), URL)
-    monkeypatch.setattr(store, "_fact_sheets", {f"VZ@v{facts.SHEET_VERSION}": sheet, "AMC": "an old sheet"})
+@pytest.fixture
+def sec(monkeypatch):
+    """A fake EDGAR and Gemini that count what gets fetched, and an empty in-memory cache."""
+    calls = {"facts": 0, "news": 0, "debt": 0}
+    state = {"accession": "000073271226000001"}
     monkeypatch.setattr(store, "_client", None)
-    monkeypatch.setattr(edgar, "get_cik", lambda t: pytest.fail("called EDGAR"))
-    assert facts.build_fact_sheet("vz") is sheet
+    monkeypatch.setattr(store, "_cache", {})
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "fake")
+    monkeypatch.setattr(edgar, "get_cik", lambda t: "0000732712")
+    monkeypatch.setattr(edgar, "latest_filing", lambda cik: (state["accession"], URL))
+
+    def company_facts(cik):
+        calls["facts"] += 1
+        return FACTS
+    monkeypatch.setattr(edgar, "get_company_facts", company_facts)
+    monkeypatch.setattr(edgar, "get_filing_text", lambda url: "[page 1]\ntext")
+    monkeypatch.setattr(edgar, "pull_fields", lambda f, t: pulled())
+    monkeypatch.setattr(edgar, "fiscal_year_end", lambda f: "2025-12-31")
+
+    def news(company, ticker):
+        calls["news"] += 1
+        return [{"label": "News · verizon.com · 2026-07-24", "url": "https://x", "excerpt": f"Verizon news #{calls['news']}."}]
+    monkeypatch.setattr(research, "news_items", news)
+
+    def debt(text, company, fy):
+        calls["debt"] += 1
+        return []
+    monkeypatch.setattr(research, "debt_instruments", debt)
+    return calls, state
+
+
+def test_second_debate_uses_the_cache(sec):
+    calls, _ = sec
+    first = facts.build_fact_sheet("VZ")
+    second = facts.build_fact_sheet("vz")
+    assert calls == {"facts": 1, "news": 1, "debt": 1}
+    assert first == second and [s.excerpt for s in second.sources if s.kind == "news"] == ["Verizon news #1."]
+
+
+def test_new_10k_rebuilds_and_clears_the_old_one(sec):
+    calls, state = sec
+    facts.build_fact_sheet("VZ")
+    state["accession"] = "000073271227000001"  # verizon files its next 10-K
+    facts.build_fact_sheet("VZ")
+    assert calls["facts"] == 2
+    filing_rows = [k for k in store._cache if k.startswith("VZ|filing|")]
+    assert filing_rows == [f"VZ|filing|000073271227000001|{facts.CODE_VERSION}"]
+
+
+def test_code_change_rebuilds(sec, monkeypatch):
+    calls, _ = sec
+    facts.build_fact_sheet("VZ")
+    monkeypatch.setattr(facts, "CODE_VERSION", "changed")
+    facts.build_fact_sheet("VZ")
+    assert calls["facts"] == 2
+
+
+def test_old_news_is_refreshed_without_rebuilding_the_10k_part(sec, monkeypatch):
+    calls, _ = sec
+    facts.build_fact_sheet("VZ")
+    later = facts._now() + facts.NEWS_MAX_AGE + timedelta(minutes=1)
+    monkeypatch.setattr(facts, "_now", lambda: later)
+    sheet = facts.build_fact_sheet("VZ")
+    assert calls == {"facts": 1, "news": 2, "debt": 1}
+    assert [s.excerpt for s in sheet.sources if s.kind == "news"] == ["Verizon news #2."]
+
+
+def gemini_down(*a):
+    raise RuntimeError("503 UNAVAILABLE")
+
+
+def test_everything_fetched_means_no_notices(sec):
+    assert facts.build_fact_sheet("VZ").notices == []
+    assert facts.build_fact_sheet("VZ").notices == []  # from the cache
+
+
+def test_failed_debt_step_says_so_and_isnt_cached(sec, monkeypatch):
+    calls, _ = sec
+    monkeypatch.setattr(research, "debt_instruments", gemini_down)
+    sheet = facts.build_fact_sheet("VZ")
+    assert sheet.metrics and sheet.debt == []
+    assert sheet.notices == [
+        "We couldn't read Verizon Communications Inc.'s debt instruments from its 10-K this time, so the debt "
+        "table is empty. The rest of the fact sheet is complete; the next debate tries again."
+    ]
+    assert not any(k.startswith("VZ|filing") for k in store._cache)
+    facts.build_fact_sheet("VZ")  # tries again
+    assert calls["facts"] == 2
+
+
+def test_failed_news_refresh_uses_older_news_and_says_so(sec, monkeypatch):
+    facts.build_fact_sheet("VZ")
+    store._cache["VZ|news"]["fetched_at"] = "2026-10-09T15:00:00+00:00"  # past NEWS_MAX_AGE
+    monkeypatch.setattr(facts, "_now", lambda: facts.datetime(2026, 10, 10, 15, tzinfo=facts.timezone.utc))
+    monkeypatch.setattr(research, "news_items", gemini_down)
+    sheet = facts.build_fact_sheet("VZ")
+    assert [s.excerpt for s in sheet.sources if s.kind == "news"] == ["Verizon news #1."]
+    assert sheet.notices == ["We couldn't refresh the news just now, so the news here is from October 9, 2026."]
+
+
+def test_no_news_at_all_says_so(sec, monkeypatch):
+    monkeypatch.setattr(research, "news_items", gemini_down)
+    sheet = facts.build_fact_sheet("VZ")
+    assert not any(s.kind == "news" for s in sheet.sources)
+    assert sheet.notices == ["We couldn't get recent news just now, so this debate uses the 10-K only."]
+
+
+def test_edgar_outage_serves_the_last_sheet_and_says_so(sec, monkeypatch):
+    built = facts.build_fact_sheet("VZ")
+    store._cache[store._cache["VZ|filing"]["key"]]["built_at"] = "2026-10-08T12:00:00+00:00"
+
+    def down(ticker):
+        raise httpx.ConnectError("connection refused")
+    monkeypatch.setattr(edgar, "get_cik", down)
+    sheet = facts.build_fact_sheet("VZ")
+    assert sheet.metrics == built.metrics and sheet.debt == built.debt
+    assert sheet.notices == [
+        "SEC EDGAR isn't responding right now; it may be down or busy. This debate uses Verizon Communications "
+        "Inc.'s fact sheet from October 8, 2026, which may be out of date."
+    ]
+
+
+def test_sec_error_that_isnt_an_outage_doesnt_say_down(sec, monkeypatch):
+    def forbidden(ticker):
+        request = httpx.Request("GET", "https://www.sec.gov/files/company_tickers.json")
+        raise httpx.HTTPStatusError("403", request=request, response=httpx.Response(403, request=request))
+    monkeypatch.setattr(edgar, "get_cik", forbidden)
+    with pytest.raises(facts.DataUnavailable) as e:
+        facts.build_fact_sheet("VZ")
+    assert "may be down" not in str(e.value)
+    assert "SEC EDGAR returned an error (HTTP 403) when we asked for VZ's filings." in str(e.value)
+
+
+@pytest.mark.parametrize("status, outage", [(429, True), (503, True), (403, False), (404, False)])
+def test_what_counts_as_an_outage(status, outage):
+    request = httpx.Request("GET", "https://data.sec.gov")
+    assert facts._is_outage(httpx.HTTPStatusError("x", request=request, response=httpx.Response(status, request=request))) is outage
+    assert facts._is_outage(httpx.ConnectTimeout("x"))
 
 
 def edgar_down(monkeypatch):
     def down(ticker):
         raise httpx.ConnectError("connection refused")
-    monkeypatch.setattr(store, "_fact_sheets", {})
+    monkeypatch.setattr(store, "_cache", {})
     monkeypatch.setattr(store, "_client", None)
     monkeypatch.setattr(edgar, "get_cik", down)
 
 
 def test_edgar_outage_says_so(monkeypatch):
     edgar_down(monkeypatch)
-    with pytest.raises(facts.DataUnavailable, match="EDGAR may be down"):
+    with pytest.raises(facts.DataUnavailable, match="it may be down"):
         facts.build_fact_sheet("VZ")
 
 
@@ -128,4 +262,5 @@ def test_edgar_outage_reaches_the_debate_page(monkeypatch):
     with TestClient(main.app).websocket_connect("/ws/debates/o1") as ws:
         msg = ws.receive_json()
     assert msg["type"] == "error"
-    assert msg["message"].startswith("We couldn't get VZ's filings from SEC EDGAR. EDGAR may be down or busy")
+    assert msg["message"] == ("We couldn't get VZ's filings. SEC EDGAR isn't responding right now; it may be down "
+                              "or busy. Try again in a few minutes, or replay a saved debate.")

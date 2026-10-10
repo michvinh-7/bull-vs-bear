@@ -83,3 +83,31 @@ def test_premise_names_the_company_and_its_metrics(monkeypatch):
     verify.check_claim(Claim(id="a", text="Debt-to-EBITDA is 13.6x.", source_id="S1"), sheet)
     assert seen == ["From Acme's filing: Revenue grew 12% to $4.1B in FY2025. "
                     "Debt-to-EBITDA was 13.6x ($4 billion debt / $296 million EBITDA)."]
+
+
+def test_metric_line_only_for_claims_stating_its_value(monkeypatch):
+    from app.schemas import Metric
+
+    seen = []
+    monkeypatch.setattr(verify, "nli", lambda premise, hypothesis: seen.append(premise) or "neutral")
+    sheet = SHEET.model_copy(update={"metrics": [
+        Metric(name="liquidity_usd", label="Total immediate liquidity", value=31e9, unit="usd",
+               formula="$19 billion cash + $12 billion undrawn revolver", source_ids=["S1"]),
+    ]})
+    verify.check_claim(Claim(id="a", text="There was $12 billion of unused revolver capacity.", source_id="S1"), sheet)
+    verify.check_claim(Claim(id="b", text="Liquidity is $31 billion.", source_id="S1"), sheet)
+    assert seen == ["From Acme's filing: Revenue grew 12% to $4.1B in FY2025.",
+                    "From Acme's filing: Revenue grew 12% to $4.1B in FY2025. "
+                    "Total immediate liquidity was $31 billion ($19 billion cash + $12 billion undrawn revolver)."]
+
+
+def test_claims_without_numbers_get_no_metric_lines(monkeypatch):
+    from app.schemas import Metric
+
+    seen = []
+    monkeypatch.setattr(verify, "nli", lambda premise, hypothesis: seen.append(premise) or "neutral")
+    sheet = SHEET.model_copy(update={"metrics": [
+        Metric(name="floating_rate_pct", label="Floating-rate debt", value=0, unit="pct", formula="$0 floating / $69.3 billion debt", source_ids=["S1"]),
+    ]})
+    verify.check_claim(Claim(id="a", text="The debt carries floating rates.", source_id="S1"), sheet)
+    assert seen == ["From Acme's filing: Revenue grew 12% to $4.1B in FY2025."]

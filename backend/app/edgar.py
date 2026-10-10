@@ -48,7 +48,9 @@ def get_company_facts(cik: str) -> dict:
     return r.json()
 
 """ [TODO] as a stretch goal, probably a good idea to look into 10-k vs 10-k/a, that would be the ammended version"""
-def latest_filing_url(cik: str, form: str = "10-K") -> str:
+def latest_filing(cik: str, form: str = "10-K") -> tuple[str, str]:
+    """(accession number, URL) of the latest filing of `form`. The accession number is SEC's
+    id for one filing, so it changes when the company files a new 10-K."""
     r = httpx.get(f"https://data.sec.gov/submissions/CIK{cik}.json", headers=HEADERS, timeout=30)
     r.raise_for_status()
     data = r.json()
@@ -59,15 +61,24 @@ def latest_filing_url(cik: str, form: str = "10-K") -> str:
             accessionNum = recent["accessionNumber"][i].replace("-", "")
             docName = recent["primaryDocument"][i]
             # url is from https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
-            return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accessionNum}/{docName}"
+            return accessionNum, f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accessionNum}/{docName}"
+    # this is a number given to every SEC file, won't necessarily be a 10-k
     raise ValueError(f"{form} not found for CIK: {cik}")
 
 
-def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
-    """Plain text of the latest filing, with "[page N]" markers so claims can cite "p. 84"."""
-    r = httpx.get(latest_filing_url(cik, form), headers=HEADERS, timeout=60)
+def latest_filing_url(cik: str, form: str = "10-K") -> str:
+    return latest_filing(cik, form)[1]
+
+
+def get_filing_text(url: str) -> str:
+    """Plain text of a filing, with "[page N]" markers so claims can cite "p. 84"."""
+    r = httpx.get(url, headers=HEADERS, timeout=60)
     r.raise_for_status()
     return filing.html_to_text(r.text)
+
+
+def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
+    return get_filing_text(latest_filing_url(cik, form))
 
 """ 
 We need to pull several metrics for the metrics.py file calculations-

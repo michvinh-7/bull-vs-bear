@@ -3,10 +3,11 @@
 EDGAR numbers + metrics + Gemini-grounded news -> one FactSheet with sources.
 Both debaters argue only from this.
 """
+import hashlib
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -15,81 +16,160 @@ from . import companies, config, edgar, metrics, research, store
 from .agents import money
 from .schemas import DebtInstrument, FactSheet, Metric, Source
 
-EXAMPLE = Path(__file__).resolve().parent / "examples" / "fact_sheet.json"  # copy of shared/examples
+APP = Path(__file__).resolve().parent
+EXAMPLE = APP / "examples" / "fact_sheet.json"  # copy of shared/examples
 # the made-up sample company; it isn't on EDGAR, so it always gets the example sheet
 SAMPLE_TICKER = "NWRC"
-# bump when the sheet's contents change, so sheets cached by older code are rebuilt
-SHEET_VERSION = 6
 
-
+# A fact sheet is cached in two parts that go stale at different times:
+#   - the 10-K part (metrics, 10-K sources, debt rows), until the company files a new 10-K
+#     or the code that builds it changes. Keyed by SEC's accession number for the filing and
+#     a fingerprint of that code, so neither needs anyone to remember to bump a version.
+#   - the news, for NEWS_MAX_AGE.
+CODE_VERSION = hashlib.sha256(b"".join(
+    (APP / name).read_bytes() for name in ("facts.py", "edgar.py", "filing.py", "research.py", "metrics.py")
+)).hexdigest()[:10]
+NEWS_MAX_AGE = timedelta(hours=12)
 
 
 class DataUnavailable(RuntimeError):
-    """EDGAR couldn't be reached. The message is shown to the user as is."""
+    """EDGAR couldn't give us the filings. The message is shown to the user as is."""
+
+
+def _is_outage(e: httpx.HTTPError) -> bool:
+    """SEC unreachable, timing out, overloaded or rate limiting us, as opposed to SEC
+    answering with an error about the request itself (a 403 or 404)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return e.response.status_code == 429 or e.response.status_code >= 500
+    return isinstance(e, httpx.TransportError)
+
+
+def _edgar_problem(ticker: str, e: httpx.HTTPError) -> str:
+    if _is_outage(e):
+        return "SEC EDGAR isn't responding right now; it may be down or busy."
+    status = e.response.status_code if isinstance(e, httpx.HTTPStatusError) else "unknown"
+    return f"SEC EDGAR returned an error (HTTP {status}) when we asked for {ticker}'s filings."
 
 
 def build_fact_sheet(ticker: str) -> FactSheet:
     """The latest 10-K's numbers, the metrics computed from them, the debt instruments and
-    recent news (both found by Gemini, checked by code), and the sources they all cite."""
+    recent news (both found by Gemini, checked by code), and the sources they all cite.
+    Anything that couldn't be fetched is said in `notices`, shown on the debate page."""
     ticker = ticker.upper()
     if ticker == SAMPLE_TICKER:
         return FactSheet.model_validate(json.loads(EXAMPLE.read_text(encoding="utf-8")))
-    # demo companies are built once, then served from the cache
-    key = f"{ticker}@v{SHEET_VERSION}"
-    if cached := store.load_fact_sheet(key):
-        return cached
-
+    notices: list[str] = []
     try:
         cik = edgar.get_cik(ticker)
-        facts = edgar.get_company_facts(cik)
-        url = edgar.latest_filing_url(cik)
-        text = edgar.get_latest_filing_text(cik)
+        accession, url = edgar.latest_filing(cik)
+        key = f"{ticker}|filing|{accession}|{CODE_VERSION}"
+        cached = store.load_cached(key)
+        if cached:
+            sheet = FactSheet.model_validate(cached["sheet"])
+            news = _news(sheet.company, ticker, notices)
+        else:
+            sheet, news = _build(ticker, cik, url, key, notices)
     except httpx.HTTPError as e:
         print(f"[facts] EDGAR request failed for {ticker}: {e!r}")
-        raise DataUnavailable(
-            f"We couldn't get {ticker}'s filings from SEC EDGAR. EDGAR may be down or busy right now; "
-            "try again in a few minutes, or replay a saved debate."
-        ) from e
-
-    sheet = fact_sheet_from(ticker, facts, edgar.pull_fields(facts, text), url)
-    if config.GEMINI_API_KEY:
-        fiscal_year = date.fromisoformat(edgar.fiscal_year_end(facts)).year
-        with ThreadPoolExecutor(2) as pool:
-            debt = pool.submit(research.debt_instruments, text, sheet.company, fiscal_year)
-            news = pool.submit(research.news_items, sheet.company, ticker)
-            sheet = add_research(sheet, _or_nothing(debt, "debt instruments"), _or_nothing(news, "news"), url)
-    store.save_fact_sheet(sheet, key)
-    return sheet
+        problem = _edgar_problem(ticker, e)
+        # the last sheet built for this company beats an error, even if it's out of date
+        last = store.load_cached(f"{ticker}|filing")
+        last = last and store.load_cached(last["key"])
+        if not last:
+            raise DataUnavailable(f"We couldn't get {ticker}'s filings. {problem} Try again in a few minutes, or replay a saved debate.") from e
+        sheet = FactSheet.model_validate(last["sheet"])
+        notices = [f"{problem} This debate uses {sheet.company}'s fact sheet from {_day(last['built_at'])}, "
+                   "which may be out of date."]
+        news = _news(sheet.company, ticker, notices)
+    return add_news(sheet, news).model_copy(update={"notices": notices})
 
 
-def _or_nothing(job, what: str) -> list:
-    """Gemini's part is extra: if it fails, the sheet is still built from the 10-K alone."""
+def _build(ticker: str, cik: str, url: str, key: str, notices: list[str]) -> tuple[FactSheet, list[dict]]:
+    """Builds the 10-K part (and fetches news alongside it), caching the 10-K part."""
+    facts = edgar.get_company_facts(cik)
+    company = _company_name(ticker, facts)
+    news_notices: list[str] = []
+    with ThreadPoolExecutor(2) as pool:
+        news = pool.submit(_news, company, ticker, news_notices)  # a search takes a while; start it now
+        text = edgar.get_filing_text(url)
+        sheet = fact_sheet_from(ticker, facts, edgar.pull_fields(facts, text), url)
+        debt, debt_ok = [], True
+        if config.GEMINI_API_KEY:
+            fiscal_year = date.fromisoformat(edgar.fiscal_year_end(facts)).year
+            try:
+                debt = research.debt_instruments(text, company, fiscal_year)
+            except Exception as e:
+                print(f"[facts] skipped debt instruments: {e!r}"[:300])
+                debt_ok = False
+                notices.append(f"We couldn't read {company}'s debt instruments from its 10-K this time, so the "
+                               "debt table is empty. The rest of the fact sheet is complete; the next debate tries again.")
+        sheet = add_debt(sheet, debt, url)
+        news = news.result()
+    notices += news_notices
+    # a sheet missing its debt rows because Gemini hiccupped isn't cached, so the next
+    # debate tries again instead of being stuck without them until the next 10-K
+    if debt_ok:
+        store.save_cached(key, {"sheet": sheet.model_dump(), "built_at": _now().isoformat()})
+        store.save_cached(f"{ticker}|filing", {"key": key})  # the latest, for when EDGAR is down
+        store.delete_cached(f"{ticker}|filing|", keep=key)  # older filings and older code
+        store.delete_cached(f"{ticker}@v")  # sheets cached before this scheme
+    return sheet, news
+
+
+def _news(company: str, ticker: str, notices: list[str]) -> list[dict]:
+    """research.news_items, fetched again once the cached copy is older than NEWS_MAX_AGE.
+    If fetching fails, older news is better than none, and `notices` says which it is."""
+    key = f"{ticker}|news"
+    cached = store.load_cached(key)
+    fresh = cached and _now() - datetime.fromisoformat(cached["fetched_at"]) < NEWS_MAX_AGE
+    if fresh or not config.GEMINI_API_KEY:
+        return cached["items"] if cached else []
     try:
-        return job.result()
+        items = research.news_items(company, ticker)
     except Exception as e:
-        print(f"[facts] skipped {what}: {e!r}"[:300])
+        print(f"[facts] couldn't refresh news: {e!r}"[:300])
+        if cached and cached["items"]:
+            notices.append(f"We couldn't refresh the news just now, so the news here is from {_day(cached['fetched_at'])}.")
+            return cached["items"]
+        notices.append("We couldn't get recent news just now, so this debate uses the 10-K only.")
         return []
+    store.save_cached(key, {"items": items, "fetched_at": _now().isoformat()})
+    return items
 
 
-def add_research(sheet: FactSheet, debt: list[tuple[dict, str, str | None]], news: list[dict], url: str) -> FactSheet:
-    """Adds research.debt_instruments rows (citing their 10-K quote) and research.news_items
-    (as N1, N2... sources) to a fact sheet."""
+def _day(iso: str) -> str:
+    """'2026-10-10T20:15:00+00:00' -> 'October 10, 2026'."""
+    d = datetime.fromisoformat(iso)
+    return f"{d:%B} {d.day}, {d.year}"
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _add_source(sources: list[Source], excerpt: str, label: str, url: str) -> str:
+    """The id of the 10-K source with this excerpt, adding it if it's new."""
+    for s in sources:
+        if s.excerpt == excerpt:
+            return s.id
+    sources.append(Source(id=f"S{sum(s.id.startswith('S') for s in sources) + 1}", kind="10-K", label=label, url=url, excerpt=excerpt))
+    return sources[-1].id
+
+
+def add_debt(sheet: FactSheet, debt: list[tuple[dict, str, str | None]], url: str) -> FactSheet:
+    """Adds research.debt_instruments rows, each citing its 10-K quote."""
     sources = list(sheet.sources)
-
-    def source_for(excerpt: str, label: str) -> str:
-        for s in sources:
-            if s.excerpt == excerpt:
-                return s.id
-        sources.append(Source(id=f"S{sum(s.id.startswith('S') for s in sources) + 1}", kind="10-K", label=label, url=url, excerpt=excerpt))
-        return sources[-1].id
-
     rows = [
-        DebtInstrument(**fields, source_id=source_for(quote, f"10-K · p. {page}" if page else "10-K"))
+        DebtInstrument(**fields, source_id=_add_source(sources, quote, f"10-K · p. {page}" if page else "10-K", url))
         for fields, quote, page in debt
     ]
-    for i, item in enumerate(news):
-        sources.append(Source(id=f"N{i + 1}", kind="news", label=item["label"], url=item["url"], excerpt=item["excerpt"]))
     return sheet.model_copy(update={"sources": sources, "debt": rows})
+
+
+def add_news(sheet: FactSheet, news: list[dict]) -> FactSheet:
+    """Adds research.news_items as N1, N2... sources."""
+    items = [Source(id=f"N{i + 1}", kind="news", label=n["label"], url=n["url"], excerpt=n["excerpt"]) for i, n in enumerate(news)]
+    return sheet.model_copy(update={"sources": [s for s in sheet.sources if s.kind != "news"] + items})
 
 
 def fact_sheet_from(ticker: str, facts: dict, pulled: dict, url: str) -> FactSheet:
@@ -100,11 +180,8 @@ def fact_sheet_from(ticker: str, facts: dict, pulled: dict, url: str) -> FactShe
     sources: list[Source] = []
 
     def add(label: str, excerpt: str) -> str:
-        for s in sources:
-            if s.excerpt == excerpt:  # two numbers from the same sentence share one source
-                return s.id
-        sources.append(Source(id=f"S{len(sources) + 1}", kind="10-K", label=label, url=url, excerpt=excerpt))
-        return sources[-1].id
+        # two numbers from the same sentence share one source
+        return _add_source(sources, excerpt, label, url)
 
     # numbers read from the 10-K text cite their own sentence and page, even one with no
     # figure in it ("We had no borrowings outstanding under ..."): it's still the evidence
