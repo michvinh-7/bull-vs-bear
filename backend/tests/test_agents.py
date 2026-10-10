@@ -262,6 +262,18 @@ def test_dropped_turn_gets_a_fresh_try_from_the_same_side(client, monkeypatch):
     assert analysts.count("bull") == analysts.count("bear") == 2
 
 
+def test_gemini_outage_ends_with_a_clear_error(client, monkeypatch):
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "fake")
+
+    def down(*a):
+        raise RuntimeError("404 NOT_FOUND model gone")
+    monkeypatch.setattr(agents, "_generate", down)
+    store.save_debate(Debate(id="d5", ticker="NWRC", max_turns=4))
+    msgs = run(client, "d5")
+    assert msgs[-1]["type"] == "error" and "404 NOT_FOUND model gone" in msgs[-1]["message"]
+    assert store.load_debate("d5").status == "error"
+
+
 def test_interrupts_are_capped(client, monkeypatch):
     monkeypatch.setattr(config, "MAX_INTERRUPTS", 0)
     slow = main.build_fact_sheet

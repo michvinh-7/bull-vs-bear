@@ -341,6 +341,7 @@ def validate_positions(out: dict, fact_sheet: FactSheet) -> list[str]:
 # ---- Gemini call (tests swap `_generate`) ----
 
 _client = None
+last_error: str | None = None  # Google's reason for the latest failed call (never contains the key)
 
 
 def _generate(system: str, user: str, schema: type[BaseModel], temperature: float) -> dict:
@@ -369,6 +370,8 @@ def _call(
     system: str, user: str, schema: type[BaseModel], temperature: float, validate: Callable[[dict], list[str]]
 ) -> dict | None:
     """One call plus one retry with the errors fed back. None if both fail."""
+    global last_error
+    last_error = None
     prompt, errs = user, []
     for _ in range(MAX_RETRIES + 1):
         try:
@@ -378,6 +381,7 @@ def _call(
             errs = [f"output did not match the schema: {str(e)[:200]}"]
         except Exception as e:  # network / API error: don't burn the retry on a re-prompt
             print(f"[agents] Gemini call failed: {e}")
+            last_error = str(e)[:300]
             return None
         if not errs:
             return out
