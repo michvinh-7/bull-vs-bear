@@ -12,8 +12,8 @@ FAKE_SEC = [
     Company(ticker="AAPL", company="Apple Inc."),
     Company(ticker="AAL", company="American Airlines Group Inc."),
     Company(ticker="PINE", company="Alpine Income Property Trust"),
-    Company(ticker="F", company="FORD MOTOR CO"),
-    Company(ticker="F-PB", company="FORD MOTOR CO"),
+    Company(ticker="GOOGL", company="Alphabet Inc."),
+    Company(ticker="GOOG", company="Alphabet Inc."),
 ]
 
 
@@ -36,8 +36,8 @@ def test_health(client, monkeypatch):
 
 def test_demo_companies(client):
     body = client.get("/companies").json()
-    assert body and all({"ticker", "company"} <= c.keys() for c in body)
-    assert body[0]["tagline"]
+    assert [c["ticker"] for c in body] == ["AMZN", "VZ", "AMC"]
+    assert all({"ticker", "company"} <= c.keys() and c["tagline"] for c in body)
 
 
 def test_search_ranks_ticker_then_name(client):
@@ -48,11 +48,11 @@ def test_search_ranks_ticker_then_name(client):
 
 
 def test_search_one_row_per_company(client):
-    assert [c["ticker"] for c in client.get("/companies/search", params={"q": "ford"}).json()] == ["F"]
+    assert [c["ticker"] for c in client.get("/companies/search", params={"q": "alphabet"}).json()] == ["GOOGL"]
 
 
 def test_search_includes_demo_companies(client):
-    assert client.get("/companies/search", params={"q": "northwind"}).json()[0]["ticker"] == "NWRC"
+    assert client.get("/companies/search", params={"q": "verizon"}).json()[0]["ticker"] == "VZ"
 
 
 def test_search_needs_a_query(client):
@@ -69,7 +69,7 @@ def test_start_debate_and_fetch_it(client):
 
 
 def test_start_debate_demo_ticker(client):
-    assert client.post("/debates", json={"ticker": "nwrc"}).status_code == 200
+    assert client.post("/debates", json={"ticker": "amc"}).status_code == 200
 
 
 def test_start_debate_rejects_bad_tickers(client):
@@ -121,12 +121,19 @@ def test_cors_allows_the_frontend_sites(client, origin, allowed):
 def test_saved_fact_sheet_is_used_instead_of_rebuilding(client, monkeypatch):
     import json as _json
     from pathlib import Path
-    from app import main
+    from app import edgar, facts
     from app.schemas import FactSheet
     sheet = FactSheet.model_validate(_json.loads(
         (Path(__file__).resolve().parents[2] / "shared" / "examples" / "fact_sheet.json").read_text(encoding="utf-8")))
-    monkeypatch.setattr(store, "_fact_sheets", {"NWRC": sheet})
-    monkeypatch.setattr(main, "build_fact_sheet", lambda t: (_ for _ in ()).throw(AssertionError("rebuilt")))
-    store.save_debate(Debate(id="c1", ticker="NWRC", max_turns=2))
+    sheet = sheet.model_copy(update={"ticker": "VZ"})
+    # VZ's latest 10-K was already built: only the quick "is there a newer 10-K?" check runs
+    monkeypatch.setattr(edgar, "get_cik", lambda t: "0000732712")
+    monkeypatch.setattr(edgar, "latest_filing", lambda cik: ("0001", "https://sec.gov/10k"))
+    monkeypatch.setattr(edgar, "get_company_facts", lambda cik: (_ for _ in ()).throw(AssertionError("rebuilt")))
+    monkeypatch.setattr(store, "_cache", {
+        f"VZ|filing|0001|{facts.CODE_VERSION}": {"sheet": sheet.model_dump(), "built_at": "2026-10-10T12:00:00+00:00"},
+    })
+    store.save_debate(Debate(id="c1", ticker="VZ", max_turns=2))
     with client.websocket_connect("/ws/debates/c1") as ws:
-        assert ws.receive_json()["type"] == "fact_sheet"
+        msg = ws.receive_json()
+        assert msg["type"] == "fact_sheet" and msg["data"]["ticker"] == "VZ"

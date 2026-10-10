@@ -49,7 +49,7 @@
   "metrics": [
     {
       "name": "leverage",
-      "label": "Leverage",
+      "label": "Debt-to-EBITDA",
       "value": 5.8,
       "unit": "x",
       "formula": "$1,800M debt / $310M EBITDA",
@@ -90,7 +90,7 @@
     },
     {
       "name": "liquidity_usd",
-      "label": "Liquidity",
+      "label": "Total immediate liquidity",
       "value": 410000000,
       "unit": "usd",
       "formula": "$110M cash + $300M undrawn revolver",

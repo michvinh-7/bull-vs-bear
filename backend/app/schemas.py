@@ -51,6 +51,11 @@ class FactSheet(BaseModel):
     sources: list[Source] = Field(default_factory=list)
     metrics: list[Metric] = Field(default_factory=list)
     debt: list[DebtInstrument] = Field(default_factory=list)
+    notices: list[str] = Field(
+        default_factory=list,
+        description="Plain-English notes for the debate page when part of the data couldn't be fetched, "
+                    "e.g. older news or EDGAR being down",
+    )
 
     def source(self, source_id: str | None) -> Source | None:
         return next((s for s in self.sources if s.id == source_id), None)

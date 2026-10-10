@@ -41,6 +41,8 @@ export interface FactSheet {
   sources: Source[];
   metrics: Metric[];
   debt: DebtInstrument[];
+  /** Plain-English notes when part of the data couldn't be fetched, e.g. older news or EDGAR being down. */
+  notices?: string[];
 }
 
 // ---- Positions (side panels) ----

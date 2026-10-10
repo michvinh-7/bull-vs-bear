@@ -209,10 +209,9 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             await pacer.wait(at_most, wake)
 
     try:
-        # Demo companies are pre-built (scripts/cache_fact_sheets.py) so the debate starts at once.
-        debate.fact_sheet = store.load_fact_sheet(debate.ticker) or await asyncio.to_thread(
-            build_fact_sheet, debate.ticker
-        )
+        # build_fact_sheet serves a cached sheet in under a second (demo companies are pre-built
+        # with scripts/cache_fact_sheets.py) and knows when it's stale: a new 10-K, old news.
+        debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
         debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
         await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})

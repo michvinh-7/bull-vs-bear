@@ -21,8 +21,10 @@ class Company(BaseModel):
 
 
 DEMO_COMPANIES = [
-    # TODO(Person 1): pick the 3 demo companies and fill in real tickers and taglines.
-    Company(ticker="NWRC", company="Northwind Retail Corp (sample)", tagline="Store closures vs. floating-rate debt"),
+    # one of each: a fortress balance sheet, a big steady borrower, and a stressed one
+    Company(ticker="AMZN", company="Amazon.com, Inc.", tagline="AI spending spree vs. a fortress balance sheet"),
+    Company(ticker="VZ", company="Verizon Communications Inc.", tagline="Steady subscriber cash vs. a giant debt load"),
+    Company(ticker="AMC", company="AMC Entertainment Holdings, Inc.", tagline="Box office comeback vs. a mountain of debt"),
 ]
 
 _sec: list[Company] | None = None

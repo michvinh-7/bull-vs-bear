@@ -181,6 +181,14 @@
       },
       "title": "Debt",
       "type": "array"
+    },
+    "notices": {
+      "description": "Plain-English notes for the debate page when part of the data couldn't be fetched, e.g. older news or EDGAR being down",
+      "items": {
+        "type": "string"
+      },
+      "title": "Notices",
+      "type": "array"
     }
   },
   "required": [
