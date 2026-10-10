@@ -10,7 +10,10 @@ Endpoints
   WS   /ws/debates/{id}         streams the debate; accepts interrupts
 """
 import asyncio
+import threading
+import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,11 +29,49 @@ from .schemas import (
     StartDebateResponse,
 )
 
-app = FastAPI(title="Bull vs Bear")
+# ---- Fact-check model warm-up ----
+# The NLI model takes a while to download and load. Loading it the first time a
+# claim needs checking stalled live debates for minutes, so it loads in the
+# background at startup and lines go out "pending" until it's ready.
+fact_check = {"state": "idle"}  # idle -> loading -> ready | failed; "off" when FACT_CHECK=false
+_warm_lock = threading.Lock()
+
+
+def _warm_up_fact_check() -> None:
+    with _warm_lock:
+        if fact_check["state"] != "idle":
+            return
+        fact_check["state"] = "loading"
+    start = time.monotonic()
+    try:
+        verify.nli("The term loan matures in 2028.", "The loan matures in 2028.")
+        fact_check["state"] = "ready"
+        print(f"[verify] fact-check model ready in {time.monotonic() - start:.0f}s")
+    except Exception as e:
+        fact_check["state"] = "failed"
+        print(f"[verify] fact-check model failed to load, labels stay pending: {e}")
+
+
+def start_fact_check_warm_up() -> None:
+    if not config.FACT_CHECK:
+        fact_check["state"] = "off"
+        return
+    threading.Thread(target=_warm_up_fact_check, daemon=True).start()
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    start_fact_check_warm_up()
+    yield
+
+
+app = FastAPI(title="Bull vs Bear", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[config.FRONTEND_ORIGIN, "http://localhost:3000"],
+    # FRONTEND_ORIGIN can list several sites (comma-separated), e.g. the custom domain.
+    allow_origins=[o.strip() for o in config.FRONTEND_ORIGIN.split(",") if o.strip()] + ["http://localhost:3000"],
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",  # the Vercel site and its preview links
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -43,6 +84,7 @@ def health():
         "gemini": {"model": config.GEMINI_MODEL, "key": "set" if config.GEMINI_API_KEY else "missing"},
         "voice": config.VOICE_ENABLED,
         "storage": "supabase" if store._client else "memory",
+        "fact_check": fact_check["state"],
     }
 
 
@@ -130,7 +172,10 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             await pacer.wait(at_most, wake)
 
     try:
-        debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
+        # Demo companies are pre-built (scripts/cache_fact_sheets.py) so the debate starts at once.
+        debate.fact_sheet = store.load_fact_sheet(debate.ticker) or await asyncio.to_thread(
+            build_fact_sheet, debate.ticker
+        )
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
         debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
         await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
@@ -149,7 +194,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             if line is None:  # Gemini broke the rules twice: drop the turn, never show broken data
                 return False
             claims, audio_url = await asyncio.gather(
-                asyncio.to_thread(_check_claims, line.claims, sheet),
+                _fact_check_in_time(line.claims, sheet),
                 asyncio.to_thread(_speak, line.text, line.speaker, debate.id, line.turn)
                 if config.VOICE_ENABLED
                 else asyncio.sleep(0, result=""),
@@ -254,10 +299,25 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         listener.cancel()
 
 
-def _check_claims(claims, sheet):
-    """The fact-checker crashing never stops the debate: the claims stay "pending"."""
+async def _fact_check_in_time(claims, sheet):
+    """Labels if the model is ready and answers within FACT_CHECK_TIMEOUT; otherwise the
+    line goes out on time with its claims "pending". Never holds up the debate."""
+    if fact_check["state"] != "ready":
+        if fact_check["state"] == "idle":
+            start_fact_check_warm_up()  # e.g. a script that didn't run the startup hook
+        return claims
     try:
-        return verify.check_claims(claims, sheet)
+        return await asyncio.wait_for(asyncio.to_thread(_check_claims, claims, sheet), config.FACT_CHECK_TIMEOUT)
+    except asyncio.TimeoutError:
+        print(f"[verify] fact-check took over {config.FACT_CHECK_TIMEOUT:.0f}s, labels stay pending")
+        return claims
+
+
+def _check_claims(claims, sheet):
+    """The fact-checker crashing never stops the debate: the claims stay "pending".
+    Works on copies so a crash halfway through doesn't leave some claims labeled."""
+    try:
+        return verify.check_claims([c.model_copy() for c in claims], sheet)
     except Exception as e:
         print(f"[verify] fact-check failed, labels stay pending: {e}")
         return claims

@@ -4,13 +4,47 @@ Reads a claim and the excerpt of the source it cites and decides if the excerpt
 backs it up. The excerpt comes from the fact sheet, never from the debater, and
 the model is independent of Gemini, so it's not the AI grading its own work.
 
-Suggested approach: an NLI model (e.g. cross-encoder/nli-deberta-v3-base or
-facebook/bart-large-mnli) with premise=excerpt, hypothesis=claim.
+Uses an NLI model (MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli) with
+  premise=excerpt, hypothesis=claim.
   entailment    -> verified
   contradiction -> contested
   neutral       -> unsupported
 """
+from functools import lru_cache
+
 from .schemas import Claim, FactSheet
+
+# Runs locally (hosted inference needs paid credits).
+# First call downloads several hundred MB of weights into ~/.cache/huggingface.
+NLI_MODEL = "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
+
+LABELS = {
+    "entailment": "verified",
+    "contradiction": "contested",
+    "neutral": "unsupported",
+}
+
+
+@lru_cache(maxsize=1)
+def _load():
+    # Imported here so the server starts fast and tests don't need torch.
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(NLI_MODEL)
+    model = AutoModelForSequenceClassification.from_pretrained(NLI_MODEL)
+    model.eval()
+    return tokenizer, model
+
+
+def nli(premise: str, hypothesis: str) -> str:
+    """Return the model's top label: entailment, contradiction or neutral."""
+    import torch
+
+    tokenizer, model = _load()
+    inputs = tokenizer(premise, hypothesis, truncation=True, max_length=512, return_tensors="pt")
+    with torch.no_grad():
+        logits = model(**inputs).logits[0]
+    return model.config.id2label[int(logits.argmax())].lower()
 
 
 def check_claim(claim: Claim, fact_sheet: FactSheet) -> Claim:
@@ -20,9 +54,12 @@ def check_claim(claim: Claim, fact_sheet: FactSheet) -> Claim:
         claim.source_id = None
         claim.label = "unsupported"
         return claim
-    # TODO(Person 1): run NLI on (source.excerpt, claim.text) and set claim.label.
+    # premise = the filing excerpt, hypothesis = what the debater said.
+    # Errors are raised, not hidden: main.py catches them and leaves labels "pending".
+    claim.label = LABELS[nli(source.excerpt, claim.text)]
     return claim
 
 
 def check_claims(claims: list[Claim], fact_sheet: FactSheet) -> list[Claim]:
+    """Every claim comes back verified, contested or unsupported, or this raises."""
     return [check_claim(c, fact_sheet) for c in claims]

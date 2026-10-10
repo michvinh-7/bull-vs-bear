@@ -363,7 +363,14 @@ def test_brief_rule_violations(gemini, change, error):
 def test_failed_brief_never_falls_back_to_the_sample_company(gemini):
     replies, _ = gemini
     bad = {**GOOD_BRIEF, "agreed": []}
-    replies += [bad, bad]
+    replies += [bad, bad, bad, bad]  # two attempts, each with one retry
     brief = agents.write_brief(SHEET, DEBATE_LINES)
     assert brief.agreed == [] and brief.disputed == [] and brief.open_questions == []
     assert [u.claim_id for u in brief.unsupported] == ["t2c2"]  # still there: it comes from labels, not Gemini
+
+
+def test_brief_gets_a_second_fresh_attempt(gemini):
+    replies, _ = gemini
+    bad = {**GOOD_BRIEF, "agreed": []}
+    replies += [bad, bad, GOOD_BRIEF]  # first attempt (and its retry) fail, second attempt works
+    assert agents.write_brief(SHEET, DEBATE_LINES).disputed

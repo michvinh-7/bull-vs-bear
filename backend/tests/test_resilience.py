@@ -154,3 +154,53 @@ def test_debate_survives_fact_checker_voice_and_storage_failures(monkeypatch):
     assert msgs[-1]["type"] == "brief" and len(lines) == 3
     assert all(l["audio_url"] == "" for l in lines)
     assert {c["label"] for l in lines for c in l["claims"]} <= {"pending", "verified", "contested", "unsupported"}
+
+
+# ---- Fact-check model: never holds up a line ----
+
+def _claims():
+    from app.schemas import Claim
+    return [Claim(id="t1c1", text="The term loan is secured.", source_id="S1")]
+
+
+def test_lines_go_out_pending_while_the_model_loads(monkeypatch):
+    import asyncio
+    monkeypatch.setitem(main.fact_check, "state", "loading")
+    out = asyncio.run(main._fact_check_in_time(_claims(), SHEET))
+    assert [c.label for c in out] == ["pending"]
+
+
+def test_slow_fact_check_times_out_to_pending(monkeypatch):
+    import asyncio
+    import time as _time
+    monkeypatch.setattr(config, "FACT_CHECK_TIMEOUT", 0.2)
+    monkeypatch.setattr(verify, "nli", lambda p, h: (_time.sleep(1), "entailment")[1])
+    out = asyncio.run(main._fact_check_in_time(_claims(), SHEET))
+    assert [c.label for c in out] == ["pending"]
+
+
+def test_fast_fact_check_labels_the_claims():
+    import asyncio
+    out = asyncio.run(main._fact_check_in_time(_claims(), SHEET))
+    assert [c.label for c in out] == ["verified"]
+
+
+def test_warm_up_reports_ready_or_failed(monkeypatch):
+    monkeypatch.setitem(main.fact_check, "state", "idle")
+    main._warm_up_fact_check()
+    assert main.fact_check["state"] == "ready"
+
+    def broken(p, h):
+        raise RuntimeError("out of memory")
+    monkeypatch.setattr(verify, "nli", broken)
+    monkeypatch.setitem(main.fact_check, "state", "idle")
+    main._warm_up_fact_check()
+    assert main.fact_check["state"] == "failed"
+
+
+def test_fact_check_off_switch(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(config, "FACT_CHECK", False)
+    monkeypatch.setitem(main.fact_check, "state", "idle")
+    out = asyncio.run(main._fact_check_in_time(_claims(), SHEET))
+    assert [c.label for c in out] == ["pending"] and main.fact_check["state"] == "off"
