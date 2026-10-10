@@ -223,14 +223,20 @@ async def debate_socket(ws: WebSocket, debate_id: str):
                 spoken += 1  # out of redos: use up the slot, but the same side still speaks next
                 # so nobody speaks twice in a row
 
+        def write_brief():
+            """Written while the last line plays, so it's ready when the debate ends."""
+            return asyncio.create_task(asyncio.to_thread(agents.write_brief, sheet, list(debate.lines)))
+
         # Keep taking questions until the last line has been heard.
+        brief = write_brief()
         while config.PACING:
             await pace(wake=interrupts, at_most=0)
             if interrupts.empty() or interrupts_used >= config.MAX_INTERRUPTS:
                 break
             await answer_question(interrupts.get_nowait())
+            brief = write_brief()  # the brief should cover the new answers too
 
-        debate.brief = await asyncio.to_thread(agents.write_brief, debate.fact_sheet, debate.lines)
+        debate.brief = await brief
         debate.status = "done"
         store.save_debate(debate)
         await ws.send_json({"type": "brief", "data": debate.brief.model_dump()})

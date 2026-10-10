@@ -55,6 +55,17 @@ with TestClient(main.app).websocket_connect("/ws/debates/cli") as ws:
         elif msg["type"] == "error":
             sys.exit(f"ERROR: {msg['message']}")
         elif msg["type"] == "brief":
+            b = msg["data"]
+            print(f"COMMITTEE BRIEF  ({now - last:.1f}s)")
+            for a in b["agreed"]:
+                print(f"  AGREED      {a['text']}  {a['claim_ids']}")
+            for d in b["disputed"]:
+                print(f"  DISPUTED    {d['topic']}  {d['claim_ids']}\n     bull: {d['bull']}\n     bear: {d['bear']}")
+            for u in b["unsupported"]:
+                print(f"  UNSUPPORTED {u['speaker']}: {u['text']}  [{u['claim_id']}]")
+            for q in b["open_questions"]:
+                print(f"  CHECK       {q['question']}\n     look in: {q['where_to_look']}")
+            print()
             break
 
 lines = store.load_debate("cli").lines

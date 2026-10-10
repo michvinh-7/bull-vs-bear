@@ -26,7 +26,7 @@ def gemini(monkeypatch):
     monkeypatch.setattr(config, "GEMINI_API_KEY", "fake")
     replies, prompts = [], []
 
-    def fake(system, user, schema, temperature):
+    def fake(system, user, schema, temperature, thinking="minimal"):
         prompts.append(user)
         return replies.pop(0)
 
@@ -313,3 +313,57 @@ def test_interrupts_are_capped(client, monkeypatch):
     store.save_debate(Debate(id="d3", ticker="NWRC", max_turns=2))
     msgs = run(client, "d3", interrupt="Anything?")
     assert not any(f for _, f in speakers(msgs))
+
+
+# ---- Committee brief ----
+
+DEBATE_LINES = [
+    line("bull", 1, [("The term loan is secured by owned real property.", "S1", "verified"),
+                     ("Northwind had $110 million of cash.", "S4", "verified")]),
+    line("bear", 2, [("62% of borrowings are variable rate.", "S3", "verified"),
+                     ("Coverage is 1.4x after a haircut.", None, "unsupported")]),
+]
+GOOD_BRIEF = {
+    "agreed": [{"text": "Northwind had $110 million of cash.", "claim_ids": ["t1c2"]}],
+    "disputed": [{"topic": "Collateral vs. rate exposure",
+                  "bull": "The secured term loan protects lenders.",
+                  "bear": "With 62% floating debt, rising rates squeeze the company.",
+                  "claim_ids": ["t1c1", "t2c1"]}],
+    "open_questions": [
+        {"question": "Is any of the floating-rate debt hedged?", "where_to_look": "10-K · Item 7A, market risk"},
+        {"question": "What are the owned stores worth today?", "where_to_look": "10-K · Item 2, Properties"},
+    ],
+}
+
+
+def test_brief_keeps_gemini_items_and_adds_unsupported_from_labels(gemini):
+    replies, _ = gemini
+    replies.append(GOOD_BRIEF)
+    brief = agents.write_brief(SHEET, DEBATE_LINES)
+    assert brief.disputed[0].claim_ids == ["t1c1", "t2c1"]
+    assert [(u.claim_id, u.speaker) for u in brief.unsupported] == [("t2c2", "bear")]
+
+
+@pytest.mark.parametrize("change, error", [
+    ({"disputed": [{**GOOD_BRIEF["disputed"][0], "claim_ids": ["t1c1"]}]}, "one bull claim and one bear claim"),
+    ({"agreed": [{"text": "Coverage is 1.4x.", "claim_ids": ["t2c2"]}]}, "labeled unsupported"),
+    ({"agreed": [{"text": "Northwind had $250 million of cash.", "claim_ids": ["t1c2"]}]}, "['250']"),
+    ({"disputed": [{**GOOD_BRIEF["disputed"][0], "bull": "The bull wins the debate on collateral."}]}, "verdict"),
+    ({"open_questions": [{**q, "where_to_look": "ask around"} for q in GOOD_BRIEF["open_questions"]]}, "name a document"),
+    ({"open_questions": GOOD_BRIEF["open_questions"][:1]}, '"open_questions" has 1 items'),
+    ({"agreed": [{"text": "Cash is fine.", "claim_ids": []}]}, "must list the claim ids"),
+])
+def test_brief_rule_violations(gemini, change, error):
+    replies, prompts = gemini
+    replies += [{**GOOD_BRIEF, **change}, GOOD_BRIEF]
+    agents.write_brief(SHEET, DEBATE_LINES)
+    assert error in prompts[1]
+
+
+def test_failed_brief_never_falls_back_to_the_sample_company(gemini):
+    replies, _ = gemini
+    bad = {**GOOD_BRIEF, "agreed": []}
+    replies += [bad, bad]
+    brief = agents.write_brief(SHEET, DEBATE_LINES)
+    assert brief.agreed == [] and brief.disputed == [] and brief.open_questions == []
+    assert [u.claim_id for u in brief.unsupported] == ["t2c2"]  # still there: it comes from labels, not Gemini
