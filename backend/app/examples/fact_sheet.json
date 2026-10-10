@@ -1,0 +1,131 @@
+{
+  "company": "Northwind Retail Corp",
+  "ticker": "NWRC",
+  "as_of": "FY2025",
+  "sources": [
+    {
+      "id": "S1",
+      "kind": "10-K",
+      "label": "10-K · Note 9, p. 84",
+      "url": "https://www.sec.gov/",
+      "excerpt": "Total debt to EBITDA was 5.8x as of fiscal year end. The Term Loan is secured by a first-priority lien on owned real property, including stores and distribution centers."
+    },
+    {
+      "id": "S2",
+      "kind": "10-K",
+      "label": "10-K · Note 9, p. 85",
+      "url": "https://www.sec.gov/",
+      "excerpt": "The $416 million Term Loan matures in March 2028 and bears interest at SOFR plus 4.25%. The $684 million 7.5% Senior Notes are unsecured and mature in 2030. Borrowings under the $1.0 billion revolving credit facility mature in 2029."
+    },
+    {
+      "id": "S3",
+      "kind": "10-Q",
+      "label": "10-Q · Liquidity, p. 31",
+      "url": "https://www.sec.gov/",
+      "excerpt": "Approximately 62% of our outstanding borrowings bear interest at variable rates. A 100 basis point increase would increase annual interest expense by approximately $11 million."
+    },
+    {
+      "id": "S4",
+      "kind": "10-Q",
+      "label": "10-Q · Liquidity, p. 30",
+      "url": "https://www.sec.gov/",
+      "excerpt": "As of quarter end we had $110 million of cash and $300 million available under the revolving credit facility. The revolver was approximately 70% drawn."
+    },
+    {
+      "id": "N1",
+      "kind": "news",
+      "label": "Retail Dive · 2026-09-14",
+      "url": "https://example.com/news/1",
+      "excerpt": "Northwind to close 40 underperforming stores"
+    },
+    {
+      "id": "N2",
+      "kind": "news",
+      "label": "Reuters · 2026-08-02",
+      "url": "https://example.com/news/2",
+      "excerpt": "Northwind same-store sales fall for third straight quarter"
+    }
+  ],
+  "metrics": [
+    {
+      "name": "leverage",
+      "label": "Leverage",
+      "value": 5.8,
+      "unit": "x",
+      "formula": "$1,800M debt / $310M EBITDA",
+      "source_ids": [
+        "S1"
+      ]
+    },
+    {
+      "name": "interest_coverage",
+      "label": "Interest coverage",
+      "value": 1.9,
+      "unit": "x",
+      "formula": "$310M EBITDA / $163M interest",
+      "source_ids": [
+        "S1",
+        "S3"
+      ]
+    },
+    {
+      "name": "floating_rate_pct",
+      "label": "Floating-rate debt",
+      "value": 62,
+      "unit": "pct",
+      "formula": "$1,116M floating / $1,800M debt",
+      "source_ids": [
+        "S3"
+      ]
+    },
+    {
+      "name": "next_maturity_year",
+      "label": "Next big maturity",
+      "value": 2028,
+      "unit": "year",
+      "formula": "$416M term loan due 2028",
+      "source_ids": [
+        "S2"
+      ]
+    },
+    {
+      "name": "liquidity_usd",
+      "label": "Liquidity",
+      "value": 410000000,
+      "unit": "usd",
+      "formula": "$110M cash + $300M undrawn revolver",
+      "source_ids": [
+        "S4"
+      ]
+    }
+  ],
+  "debt": [
+    {
+      "name": "Revolving credit facility",
+      "amount_usd": 700000000,
+      "seniority": "senior_secured",
+      "rate_type": "floating",
+      "rate": "SOFR + 3.75%",
+      "maturity_year": 2029,
+      "source_id": "S2"
+    },
+    {
+      "name": "Senior secured term loan",
+      "amount_usd": 416000000,
+      "seniority": "senior_secured",
+      "rate_type": "floating",
+      "rate": "SOFR + 4.25%",
+      "maturity_year": 2028,
+      "source_id": "S2"
+    },
+    {
+      "name": "7.5% senior unsecured notes",
+      "amount_usd": 684000000,
+      "seniority": "senior_unsecured",
+      "rate_type": "fixed",
+      "rate": "7.5%",
+      "maturity_year": 2030,
+      "source_id": "S2"
+    }
+  ]
+}

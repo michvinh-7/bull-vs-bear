@@ -1,0 +1,42 @@
+[
+  {
+    "turn": 1,
+    "speaker": "bull",
+    "from_user": false,
+    "text": "Leverage looks high at 5.8x, but the term loan is secured by owned stores and distribution centers. Lenders get paid first.",
+    "claims": [
+      { "id": "t1c1", "text": "Leverage is 5.8x", "source_id": "S1", "label": "verified" },
+      { "id": "t1c2", "text": "The term loan is secured by owned stores and distribution centers", "source_id": "S1", "label": "verified" }
+    ],
+    "audio_url": ""
+  },
+  {
+    "turn": 2,
+    "speaker": "bear",
+    "from_user": false,
+    "text": "Hold on. Sixty-two percent of that debt floats. Coverage is already under 2x, and a 200 bp move puts it near 1.3x.",
+    "claims": [
+      { "id": "t2c1", "text": "62% of debt is floating rate", "source_id": "S3", "label": "verified" },
+      { "id": "t2c2", "text": "A 200 bp move puts coverage near 1.3x", "source_id": "S3", "label": "contested" }
+    ],
+    "audio_url": ""
+  },
+  {
+    "turn": 3,
+    "speaker": "moderator",
+    "from_user": false,
+    "text": "Bull, the bear's rate math is the key risk. What happens to recovery if the stores sell at a discount?",
+    "claims": [],
+    "audio_url": ""
+  },
+  {
+    "turn": 4,
+    "speaker": "bull",
+    "from_user": false,
+    "text": "Even at a 30% haircut on appraised value, the senior loan is covered 1.4 times.",
+    "claims": [
+      { "id": "t4c1", "text": "Senior loan is covered 1.4x at a 30% haircut", "source_id": null, "label": "unsupported" }
+    ],
+    "audio_url": ""
+  }
+]

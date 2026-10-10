@@ -1,2 +1,0 @@
-# Railway builds from the repo root so the backend can read shared/ at runtime.
--r backend/requirements.txt
