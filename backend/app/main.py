@@ -3,7 +3,8 @@
 Endpoints
   GET  /health                  liveness check for Railway
   GET  /companies               the pre-cached demo companies
-  POST /debates                 start a debate -> {debate_id}
+  GET  /companies/search?q=     up to 10 companies matching a name or ticker
+  POST /debates                 start a debate -> {debate_id}; 400 empty, 404 unknown ticker
   GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
   GET  /debates/{id}/brief      committee brief only
   WS   /ws/debates/{id}         streams the debate; accepts interrupts
@@ -11,10 +12,11 @@ Endpoints
 import asyncio
 import uuid
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import agents, config, store, verify, voice
+from . import agents, companies, config, store, verify, voice
+from .companies import Company
 from .facts import build_fact_sheet
 from .schemas import (
     CommitteeBrief,
@@ -32,25 +34,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DEMO_COMPANIES = [
-    # TODO(Person 1): pick the 3 demo companies and fill in real tickers.
-    {"ticker": "NWRC", "company": "Northwind Retail Corp (sample)"},
-]
-
-
 @app.get("/health")
 def health():
     return {"ok": True}
 
 
-@app.get("/companies")
-def companies():
-    return DEMO_COMPANIES
+@app.get("/companies", response_model=list[Company], response_model_exclude_none=True)
+def list_companies():
+    return companies.DEMO_COMPANIES
+
+
+@app.get("/companies/search", response_model=list[Company], response_model_exclude_none=True)
+def search_companies(q: str = Query(..., min_length=1, max_length=50)):
+    return companies.search(q)
 
 
 @app.post("/debates", response_model=StartDebateResponse)
 def start_debate(req: StartDebateRequest):
-    debate = Debate(id=uuid.uuid4().hex[:12], ticker=req.ticker.upper(), max_turns=config.MAX_TURNS)
+    ticker = req.ticker.strip().upper()
+    if not ticker:
+        raise HTTPException(400, "Ticker is required")
+    if not companies.is_known(ticker):
+        raise HTTPException(404, f"No public company with ticker {ticker}")
+    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS)
     store.save_debate(debate)
     return StartDebateResponse(debate_id=debate.id)
 
