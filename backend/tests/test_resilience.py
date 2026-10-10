@@ -196,3 +196,11 @@ def test_warm_up_reports_ready_or_failed(monkeypatch):
     monkeypatch.setitem(main.fact_check, "state", "idle")
     main._warm_up_fact_check()
     assert main.fact_check["state"] == "failed"
+
+
+def test_fact_check_off_switch(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(config, "FACT_CHECK", False)
+    monkeypatch.setitem(main.fact_check, "state", "idle")
+    out = asyncio.run(main._fact_check_in_time(_claims(), SHEET))
+    assert [c.label for c in out] == ["pending"] and main.fact_check["state"] == "off"

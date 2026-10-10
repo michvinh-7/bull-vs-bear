@@ -28,6 +28,9 @@ VOICE_ENABLED = os.getenv("VOICE_ENABLED", "false").lower() == "true"
 
 MAX_TURNS = int(os.getenv("MAX_TURNS", "8"))  # bull + bear lines, not counting moderator or interrupts
 
+# Off switch for the NLI fact-checker (e.g. if it runs the server out of memory): labels stay "pending".
+FACT_CHECK = os.getenv("FACT_CHECK", "true").lower() == "true"
+
 # Longest a line waits for fact-check labels before going out with "pending".
 FACT_CHECK_TIMEOUT = float(os.getenv("FACT_CHECK_TIMEOUT", "8"))
 

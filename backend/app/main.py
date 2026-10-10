@@ -33,7 +33,7 @@ from .schemas import (
 # The NLI model takes a while to download and load. Loading it the first time a
 # claim needs checking stalled live debates for minutes, so it loads in the
 # background at startup and lines go out "pending" until it's ready.
-fact_check = {"state": "idle"}  # idle -> loading -> ready | failed
+fact_check = {"state": "idle"}  # idle -> loading -> ready | failed; "off" when FACT_CHECK=false
 _warm_lock = threading.Lock()
 
 
@@ -53,6 +53,9 @@ def _warm_up_fact_check() -> None:
 
 
 def start_fact_check_warm_up() -> None:
+    if not config.FACT_CHECK:
+        fact_check["state"] = "off"
+        return
     threading.Thread(target=_warm_up_fact_check, daemon=True).start()
 
 
