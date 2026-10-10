@@ -9,7 +9,7 @@ export function wsUrl(debateId: string) {
 }
 
 /** The backend's own error message (FastAPI puts it in `detail`), or a fallback. */
-async function errorFrom(res: Response, fallback: string): Promise<Error> {
+export async function errorFrom(res: Response, fallback: string): Promise<Error> {
   try {
     const body = await res.json();
     if (typeof body?.detail === "string") return new Error(body.detail);

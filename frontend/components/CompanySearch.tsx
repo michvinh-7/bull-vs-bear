@@ -5,7 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { searchCompanies, type DemoCompany } from "@/lib/companies";
+import { resolveTicker, searchCompanies, type DemoCompany } from "@/lib/companies";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,12 +41,6 @@ export default function CompanySearch({ onPick, busy }: { onPick: (ticker: strin
     };
   }, [query]);
 
-  /** What "Start debate" means for free text: an exact ticker, else the top suggestion, else the raw text. */
-  function resolve(): string {
-    const q = query.trim().toUpperCase();
-    return (results.find((r) => r.ticker === q) ?? results[0])?.ticker ?? q;
-  }
-
   function pick(ticker: string) {
     setOpen(false);
     onPick(ticker);
@@ -59,7 +53,7 @@ export default function CompanySearch({ onPick, busy }: { onPick: (ticker: strin
       className="flex w-full max-w-xl flex-col gap-2 sm:flex-row"
       onSubmit={(e) => {
         e.preventDefault();
-        if (query.trim()) pick(active >= 0 ? results[active].ticker : resolve());
+        if (query.trim()) pick(active >= 0 ? results[active].ticker : resolveTicker(query, results));
       }}
     >
       <div className="relative flex-1">

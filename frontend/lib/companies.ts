@@ -37,3 +37,9 @@ export async function searchCompanies(q: string, signal?: AbortSignal): Promise<
   if (!res.ok) return [];
   return res.json();
 }
+
+/** What "Start debate" means for typed text: an exact ticker, else the top suggestion, else the raw text. */
+export function resolveTicker(query: string, results: DemoCompany[]): string {
+  const q = query.trim().toUpperCase();
+  return (results.find((r) => r.ticker === q) ?? results[0])?.ticker ?? q;
+}

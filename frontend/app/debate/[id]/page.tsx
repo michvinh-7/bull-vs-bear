@@ -15,12 +15,10 @@ import { Input } from "@/components/ui/input";
 import ClaimBadge from "@/components/ClaimBadge";
 import { USE_MOCK } from "@/lib/api";
 import { formatMetric, metricsMentioned } from "@/lib/format";
+import { closedReason, MAX_QUESTIONS, serverFinished } from "@/lib/questions";
 import type { Label, Metric, Side } from "@/lib/types";
 import { useDebate } from "@/lib/useDebate";
 import { usePlayback } from "@/lib/usePlayback";
-
-// Must match MAX_INTERRUPTS on the backend (backend/app/config.py).
-const MAX_QUESTIONS = 3;
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
@@ -54,18 +52,13 @@ export default function DebateRoom() {
   // Why the interrupt bar is closed, if it is. The backend writes ahead of the audio,
   // so it can stop taking questions before the audience hears the last line.
   const questionsAsked = lines.filter((l) => l.from_user).length + (pendingQuestion ? 1 : 0);
-  const serverFinished = !USE_MOCK && (!!brief || (maxTurns !== null && lines.length >= maxTurns && !thinking));
-  const closedReason = replay
-    ? "This is a replay, so questions are off"
-    : done
-      ? "The debate has ended"
-      : serverFinished
-        ? "The committee has finished taking questions"
-        : questionsAsked >= MAX_QUESTIONS
-          ? `Question limit reached (${MAX_QUESTIONS} per debate)`
-          : waitingQuestion
-            ? "Waiting for the committee…"
-            : null;
+  const reason = closedReason({
+    replay,
+    done,
+    serverFinished: !USE_MOCK && serverFinished({ brief: !!brief, lines: lines.length, maxTurns, thinking: !!thinking }),
+    asked: questionsAsked,
+    waiting: !!waitingQuestion,
+  });
   useEffect(() => {
     const el = floorRef.current;
     if (done && el) setTimeout(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }), 100);
@@ -172,20 +165,20 @@ export default function DebateRoom() {
             className="flex gap-2 border-t p-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!question.trim() || closedReason) return;
+              if (!question.trim() || reason) return;
               interrupt(question.trim());
               setQuestion("");
             }}
           >
-            <Button type="submit" className="rounded-full bg-unsupported text-black hover:bg-unsupported/90" disabled={!!closedReason}>
+            <Button type="submit" className="rounded-full bg-unsupported text-black hover:bg-unsupported/90" disabled={!!reason}>
               <Mic /> Interrupt
             </Button>
             <Input
               className="rounded-full"
-              placeholder={closedReason ?? `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
+              placeholder={reason ?? `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              disabled={!!closedReason}
+              disabled={!!reason}
             />
           </form>
         </Card>
