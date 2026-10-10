@@ -9,13 +9,14 @@ import Mascot from "@/components/debate/Mascot";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Logo from "@/components/Logo";
+import SettingsSheet from "@/components/SettingsSheet";
 import { ThemeToggle } from "@/components/theme";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
 import { findSource } from "@/lib/format";
-import { DISCLAIMER, type Claim, type Debate, type Label, type Side, type Speaker } from "@/lib/types";
+import { DISCLAIMER, type Claim, type Debate, type Label, type Side, type Speaker, type Usage } from "@/lib/types";
 
 /** A claim plus who said it, looked up from the debate transcript by claim id. */
 type Found = { claim: Claim; speaker: Speaker };
@@ -65,7 +66,7 @@ export default function BriefPage() {
   const count = (label: Label) => all.filter((c) => c.label === label).length;
 
   return (
-    <Shell id={id}>
+    <Shell id={id} usage={debate.usage}>
       {/* Title */}
       <section className="flex flex-col gap-4">
         <div>
@@ -198,13 +199,14 @@ export default function BriefPage() {
   );
 }
 
-function Shell({ id, children }: { id: string; children: React.ReactNode }) {
+function Shell({ id, usage, children }: { id: string; usage?: Usage | null; children: React.ReactNode }) {
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 pt-5 pb-16">
       <header className="flex items-center justify-between gap-3">
         <Logo />
         <div className="flex items-center gap-1">
           <ReplayButton id={id} variant="ghost" />
+          <SettingsSheet current={usage} />
           <ThemeToggle />
         </div>
       </header>

@@ -9,6 +9,7 @@ import SidePanel, { type PanelStatus } from "@/components/debate/SidePanel";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Logo from "@/components/Logo";
+import SettingsSheet from "@/components/SettingsSheet";
 import { ThemeToggle } from "@/components/theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import { usePlayback } from "@/lib/usePlayback";
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay } = useDebate(id);
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage } = useDebate(id);
   const play = usePlayback(lines);
   const [question, setQuestion] = useState("");
   const [selected, setSelected] = useState<SelectedClaim | null>(null);
@@ -92,6 +93,7 @@ export default function DebateRoom() {
               {play.finished && brief ? " · Debate finished" : ""}
             </span>
           </div>
+          <SettingsSheet current={usage} />
           <ThemeToggle />
         </div>
       </header>

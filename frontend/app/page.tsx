@@ -8,12 +8,14 @@ import ClaimBadge from "@/components/ClaimBadge";
 import CompanySearch from "@/components/CompanySearch";
 import Mascot from "@/components/debate/Mascot";
 import Logo from "@/components/Logo";
+import SettingsSheet from "@/components/SettingsSheet";
 import { ThemeToggle } from "@/components/theme";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { startDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
+import { getApiKey, getModel } from "@/lib/settings";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
 import type { Label } from "@/lib/types";
 
@@ -31,7 +33,7 @@ export default function Home() {
     unlockAudio(); // must run inside the click, before any await
     setStarting(t.trim().toUpperCase());
     try {
-      const id = await startDebate(t.trim());
+      const id = await startDebate(t.trim(), { model: getModel(), apiKey: getApiKey() });
       router.push(`/debate/${id}`);
     } catch (e) {
       toast.error("Couldn’t start the debate", { description: (e as Error).message });
@@ -52,6 +54,7 @@ export default function Home() {
             <Button variant="ghost" size="sm" asChild>
               <a href="#how">How it works</a>
             </Button>
+            <SettingsSheet />
             <ThemeToggle />
           </div>
         </nav>
