@@ -440,7 +440,7 @@ def validate_positions(out: dict, fact_sheet: FactSheet) -> list[str]:
 
 # ---- Gemini call (tests swap `_generate`) ----
 
-_clients: dict[str, object] = {}  # one Gemini client per API key (the team's, or a user's own)
+_server_client = None  # the team's key; users' own keys get a client that lives on their debate only
 last_error: str | None = None  # Google's reason for the latest failed call (never contains the key)
 
 
@@ -450,14 +450,30 @@ def has_key() -> bool:
     return bool((ctx and ctx.api_key) or config.GEMINI_API_KEY)
 
 
-def _client_for(api_key: str):
+def _client_for(ctx):
+    """The team's client is shared. A user's own key gets a client stored on their debate's
+    context, so it's gone with the debate: no module-level cache ever holds a user's key."""
+    global _server_client
     from google import genai
     from google.genai import types
 
-    if api_key not in _clients:
+    def make(api_key: str):
         # A stuck call fails after 20 s instead of freezing the debate.
-        _clients[api_key] = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=20_000))
-    return _clients[api_key]
+        return genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=20_000))
+
+    if ctx is not None and ctx.api_key:
+        if getattr(ctx, "client", None) is None:
+            ctx.client = make(ctx.api_key)
+        return ctx.client
+    if _server_client is None:
+        _server_client = make(config.GEMINI_API_KEY)
+    return _server_client
+
+
+def key_rejected(error: str | None) -> bool:
+    """Google refused the API key itself (wrong, revoked, no access), not a busy server."""
+    e = (error or "").lower()
+    return any(s in e for s in ("api key not valid", "api_key_invalid", "permission_denied", "401", "403"))
 
 
 def _generate(system: str, user: str, schema: type[BaseModel], temperature: float, thinking: str = "minimal") -> dict:
@@ -466,7 +482,7 @@ def _generate(system: str, user: str, schema: type[BaseModel], temperature: floa
     # The debate's model and key (picked in Settings), else the server defaults.
     ctx = usage.current()
     model = ctx.model if ctx else config.GEMINI_MODEL
-    client = _client_for((ctx and ctx.api_key) or config.GEMINI_API_KEY)
+    client = _client_for(ctx)
     resp = client.models.generate_content(
         model=model,
         contents=user,

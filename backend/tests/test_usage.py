@@ -84,7 +84,8 @@ class FakeClient:
 def clients(monkeypatch):
     fakes = {}
 
-    def client_for(key):
+    def client_for(ctx):
+        key = (ctx and ctx.api_key) or config.GEMINI_API_KEY
         return fakes.setdefault(key, FakeClient(None))
 
     monkeypatch.setattr(agents, "_client_for", client_for)
@@ -216,3 +217,26 @@ def test_debate_streams_usage_and_forgets_the_key_at_the_end(client, monkeypatch
 def test_old_debates_without_usage_still_load():
     d = Debate.model_validate({"id": "x", "ticker": "NWRC"})
     assert d.usage is None and d.model is None
+
+
+def test_a_users_key_is_not_kept_after_their_debate(monkeypatch):
+    """The user's client lives on their debate context only; nothing module-level holds the key."""
+    import gc
+    from google import genai
+    monkeypatch.setattr(genai, "Client", lambda api_key, http_options: SimpleNamespace(key=api_key))
+    ctx = usage.DebateContext(model="gemini-3.6-flash", usage=usage.Usage(model="gemini-3.6-flash"), api_key=USER_KEY)
+    assert agents._client_for(ctx).key == USER_KEY
+    assert agents._client_for(ctx) is ctx.client  # reused within the debate
+    del ctx
+    gc.collect()
+    assert USER_KEY not in repr(vars(agents))
+
+
+@pytest.mark.parametrize("error, rejected", [
+    ("400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key.", True),
+    ("403 PERMISSION_DENIED. Your key can't use this model.", True),
+    ("503 UNAVAILABLE. The model is overloaded.", False),
+    (None, False),
+])
+def test_key_rejected(error, rejected):
+    assert agents.key_rejected(error) is rejected
