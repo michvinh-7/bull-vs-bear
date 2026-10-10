@@ -26,4 +26,7 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 # Turn voice off while iterating on debate text to save ElevenLabs credits.
 VOICE_ENABLED = os.getenv("VOICE_ENABLED", "false").lower() == "true"
 
-MAX_TURNS = int(os.getenv("MAX_TURNS", "8"))
+MAX_TURNS = int(os.getenv("MAX_TURNS", "8"))  # bull + bear lines, not counting moderator or interrupts
+
+# Each user interrupt adds 3 lines (question + both sides); capped to protect voice credits.
+MAX_INTERRUPTS = int(os.getenv("MAX_INTERRUPTS", "3"))
