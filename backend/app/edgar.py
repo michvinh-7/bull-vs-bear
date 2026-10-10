@@ -119,6 +119,9 @@ def fiscal_year_end(facts: dict) -> str:
             if e.get("form") in ANNUAL_FORMS and e.get("fp") == "FY" and is_annual(e):
                 dates.append(e["end"])
     if not dates:
+        if "us-gaap" not in facts.get("facts", {}) or "ifrs-full" in facts.get("facts", {}):
+            # foreign companies (toyota, etc.) file 20-Fs under IFRS, not 10-Ks under US GAAP
+            raise ValueError(f"{facts.get('entityName', 'this company')} doesn't file US GAAP 10-Ks")
         raise ValueError("no annual net income found in company facts")
     return max(dates)
 
@@ -162,10 +165,27 @@ def total_debt(facts: dict, end: str) -> tuple[float | None, list[str]]:
     if val is not None:
         debts[tag] = val
     else:
-        for tags in (("DebtCurrent", "LongTermDebtCurrent"), ("LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations")):
-            v, tg = lookup(facts, *tags, end=end)
-            if v is not None:
-                debts[tg] = v
+        noncurrent, noncurrent_tag = lookup(facts, "LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations", end=end)
+        # the current portion alone is a sliver of the debt, so only use the split when both halves are there
+        if noncurrent is not None:
+            current, current_tag = lookup(facts, "DebtCurrent", "LongTermDebtCurrent", end=end)
+            if current is not None:
+                debts[current_tag] = current
+            debts[noncurrent_tag] = noncurrent
+    if not debts:
+        # one combined total (GM), or notes payable (realty income and other REITs)
+        val, tag = lookup(
+            facts,
+            "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+            "DebtAndCapitalLeaseObligations",
+            "NotesPayable",
+            end=end,
+        )
+        if val is not None:
+            debts[tag] = val
+    if not debts:
+        # short-term borrowings alone would make a big borrower look tiny, so give up instead
+        return None, []
     if "DebtCurrent" not in debts:
         for t in ("ShortTermBorrowings", "CommercialPaper"):
             v, tg = lookup(facts, t, end=end)
@@ -184,21 +204,34 @@ def income_taxes(facts: dict, end: str):
 
 
 def interest_expense(facts: dict, end: str):
-    # InterestPaidNet is cash interest paid (from the cash flow statement), close enough when a
-    # company doesn't tag the expense itself, like kohl's. apple reports neither anymore.
+    # boeing uses InterestAndDebtExpense
     return lookup(
-        facts, "InterestExpense", "InterestExpenseDebt", "InterestExpenseNonoperating", "InterestPaidNet", end=end
+        facts, "InterestExpense", "InterestExpenseDebt", "InterestExpenseNonoperating", "InterestAndDebtExpense", end=end
     )
 
 
-def depreciation_amortization(facts: dict, end: str):
-    return lookup(
+def interest_paid(facts: dict, end: str):
+    # cash interest paid (from the cash flow statement); a last resort when neither XBRL nor
+    # the income statement has interest expense, like kohl's
+    return lookup(facts, "InterestPaidNet", end=end)
+
+
+def depreciation_amortization(facts: dict, end: str) -> tuple[float | None, list[str]]:
+    val, tag = lookup(
         facts,
         "DepreciationDepletionAndAmortization",
         "DepreciationAndAmortization",
         "DepreciationAmortizationAndAccretionNet",
         end=end,
     )
+    if val is not None:
+        return val, [tag]
+    # microsoft, tesla, intel only tag the two halves separately
+    dep, dep_tag = lookup(facts, "Depreciation", end=end)
+    if dep is None:
+        return None, []
+    amort, amort_tag = lookup(facts, "AmortizationOfIntangibleAssets", end=end)
+    return dep + (amort or 0), [dep_tag] + ([amort_tag] if amort_tag else [])
 
 
 def ebit(facts: dict, end: str):
@@ -206,9 +239,25 @@ def ebit(facts: dict, end: str):
     return lookup(facts, "OperatingIncomeLoss", end=end)
 
 
+def pretax_income(facts: dict, end: str):
+    # for companies that don't report operating income (HCA, REITs): EBIT = pre-tax income + interest
+    return lookup(
+        facts,
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+        end=end,
+    )
+
+
 # balance sheet pieces (a snapshot on the fiscal year end date)
 def cash(facts: dict, end: str):
-    return lookup(facts, "CashAndCashEquivalentsAtCarryingValue", end=end)
+    # target and american airlines only tag cash together with restricted cash
+    return lookup(
+        facts,
+        "CashAndCashEquivalentsAtCarryingValue",
+        "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+        end=end,
+    )
 
 
 def undrawn_revolver(facts: dict, end: str) -> tuple[float | None, list[str]]:
@@ -237,11 +286,22 @@ def maturities(facts: dict, end: str) -> dict[int, float]:
         v, _ = lookup(facts, tag, end=end)
         if v is not None:
             out[year + n] = v
+    # HCA stopped tagging year one; the current portion of debt is the same thing
+    if out and year + 1 not in out:
+        v, _ = lookup(facts, "LongTermDebtCurrent", "DebtCurrent", end=end)
+        if v is not None:
+            out[year + 1] = v
     return out
 
 
-def maturities_after_year_five(facts: dict, end: str):
-    return lookup(facts, _AFTER_YEAR_FIVE_TAG, end=end)
+def maturities_after_year_five(facts: dict, end: str, years_one_to_five: dict[int, float], debt: float | None):
+    val, tag = lookup(facts, _AFTER_YEAR_FIVE_TAG, end=end)
+    if val is not None:
+        return val, [tag]
+    # boeing, HCA, nextera tag years 1-5 but not the rest: it's whatever debt is left
+    if years_one_to_five and debt and debt > sum(years_one_to_five.values()):
+        return debt - sum(years_one_to_five.values()), ["total debt minus years 1-5"]
+    return None, []
 
 
 def pull_fields(facts: dict, text: str | None = None) -> dict:
@@ -254,7 +314,18 @@ def pull_fields(facts: dict, text: str | None = None) -> dict:
     fact sheet sources.
     """
     end = fiscal_year_end(facts)
+    # a bank's interest expense is mostly paid on deposits and its "debt" funds its loans, so
+    # leverage and coverage would be meaningless; better to say so than show a wrong debate
+    if lookup(facts, "Deposits", "InterestExpenseDeposits", end=end)[0]:
+        raise ValueError(f"{facts.get('entityName', 'this company')} is a bank; credit metrics here don't apply to banks")
     fields, tags, excerpts = {}, {}, {}
+
+    def from_xbrl(name, val, tag):
+        fields[name], tags[name] = val, (tag if isinstance(tag, list) else [tag] if tag else [])
+
+    def from_text(name, val, excerpt):
+        fields[name], tags[name], excerpts[name] = val, [], excerpt
+
     for name, fn in [
         ("net_income", net_income),
         ("income_taxes", income_taxes),
@@ -262,22 +333,17 @@ def pull_fields(facts: dict, text: str | None = None) -> dict:
         ("depreciation_amortization", depreciation_amortization),
         ("ebit", ebit),
         ("cash", cash),
+        ("total_debt", total_debt),
+        ("undrawn_revolver", undrawn_revolver),
     ]:
-        val, tag = fn(facts, end)
-        fields[name], tags[name] = val, [tag] if tag else []
-    fields["total_debt"], tags["total_debt"] = total_debt(facts, end)
-    fields["undrawn_revolver"], tags["undrawn_revolver"] = undrawn_revolver(facts, end)
+        from_xbrl(name, *fn(facts, end))
     fields["maturities"] = maturities(facts, end)
-    val, tag = maturities_after_year_five(facts, end)
-    fields["maturities_after_year_five"], tags["maturities_after_year_five"] = val, [tag] if tag else []
     fields["floating_debt"], tags["floating_debt"] = None, []
+    fy = date.fromisoformat(end).year
 
     if text:
-        def from_text(name, val, excerpt):
-            fields[name], tags[name], excerpts[name] = val, [], excerpt
-
         if fields["interest_expense"] is None:
-            val, ex = filing.income_statement_value(text, r"Interest expense(?:, net)?", date.fromisoformat(end).year)
+            val, ex = filing.income_statement_value(text, r"Interest expense(?:, net)?", fy)
             if val is not None:
                 from_text("interest_expense", val, ex)
         # the text names the revolver specifically; the XBRL tag can lump in other credit lines
@@ -287,6 +353,25 @@ def pull_fields(facts: dict, text: str | None = None) -> dict:
         val, ex = filing.floating_rate_debt(text, fields["total_debt"])
         if val is not None:
             from_text("floating_debt", val, ex)
+        if not fields["maturities"]:
+            table, after, ex = filing.debt_maturities(text, fy, fields["total_debt"])
+            if table:
+                fields["maturities"], excerpts["maturities"] = table, ex
+                fields["maturities_after_year_five"], tags["maturities_after_year_five"] = after, []
+                excerpts["maturities_after_year_five"] = ex
+
+    if fields["interest_expense"] is None:
+        from_xbrl("interest_expense", *interest_paid(facts, end))
+    if fields["ebit"] is None and fields["interest_expense"] is not None:
+        pretax, pretax_tag = pretax_income(facts, end)
+        if pretax is not None:
+            fields["ebit"] = pretax + fields["interest_expense"]
+            tags["ebit"] = [pretax_tag] + (tags["interest_expense"] or ["interest expense from the 10-K"])
+    if "maturities_after_year_five" not in fields:
+        from_xbrl(
+            "maturities_after_year_five",
+            *maturities_after_year_five(facts, end, fields["maturities"], fields["total_debt"]),
+        )
 
     return {"fiscal_year_end": end, "fields": fields, "tags": tags, "excerpts": excerpts}
 

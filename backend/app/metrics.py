@@ -3,8 +3,49 @@
 The AI never does math. Every number the debaters quote comes from here.
 Done when every metric matches a hand calculation from the 10-K.
 
+
+[TODO: move this to README later]
 Definitions and formulas:
+
+Leverage:
+[Total debt]/[EBITDA]
+This shows the gains vs losses since it compares the debt/loans taken on by the business with the gains/cash flow. 
+
+- EBITDA: [net income] + [interest] + [taxes] + [deprecation] + [amortization]
+This gives a picture of the business's cash flow.
+We calculate it as [operating income (EBIT)] + [depreciation and amortization], which is the same
+thing without one-off gains/losses below operating income (see ebitda()).
+
+Interest Coverage:
+[EBIT]/[Interest Expense]
+Shows how many times a company can pay its obligations (money that was lent, etc) with its earnings. 
+A low ratio could suggest high debt.
+
+Floating vs. Fixed Debt:
+
+Two different loan types - 
+- fixed: a constant interest rate throughout the life of the loan
+- floating: also known as a variable interest rate - adjusting periodically based off some sort of benchmark. 
+
+(Debt) Maturity Wall: 
+This is when a large amount of a firm's debt is due within a short period of time (1-2 years), which increases the risk of it rolling over.
+
+Liquidity: 
+Ease in which an asset or security can become cash. 
+Usually a ratio
+Here, we are using the undrawn revolver amount which is only used when a borrower can sign/affirm that there is no upcoming default.
+This would be a loan between corporate banks and clients - this has fees for the banks to benefit from (upfront, utlization/drawn margin, committment fees.)
 """
+
+
+def ebitda(ebit: float, depreciation_amortization: float) -> float:
+    """EBIT (operating income) + depreciation and amortization.
+
+    Same as net income + interest + taxes + D&A, minus the one-off items below operating
+    income (like AMC's $196M loss on paying off debt early), which would make the
+    company look worse than its business is.
+    """
+    return ebit + depreciation_amortization
 
 
 def leverage(total_debt: float, ebitda: float) -> float:

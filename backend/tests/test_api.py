@@ -12,8 +12,8 @@ FAKE_SEC = [
     Company(ticker="AAPL", company="Apple Inc."),
     Company(ticker="AAL", company="American Airlines Group Inc."),
     Company(ticker="PINE", company="Alpine Income Property Trust"),
-    Company(ticker="F", company="FORD MOTOR CO"),
-    Company(ticker="F-PB", company="FORD MOTOR CO"),
+    Company(ticker="GOOGL", company="Alphabet Inc."),
+    Company(ticker="GOOG", company="Alphabet Inc."),
 ]
 
 
@@ -36,8 +36,8 @@ def test_health(client, monkeypatch):
 
 def test_demo_companies(client):
     body = client.get("/companies").json()
-    assert body and all({"ticker", "company"} <= c.keys() for c in body)
-    assert body[0]["tagline"]
+    assert [c["ticker"] for c in body] == ["AMZN", "VZ", "AMC"]
+    assert all({"ticker", "company"} <= c.keys() and c["tagline"] for c in body)
 
 
 def test_search_ranks_ticker_then_name(client):
@@ -48,11 +48,11 @@ def test_search_ranks_ticker_then_name(client):
 
 
 def test_search_one_row_per_company(client):
-    assert [c["ticker"] for c in client.get("/companies/search", params={"q": "ford"}).json()] == ["F"]
+    assert [c["ticker"] for c in client.get("/companies/search", params={"q": "alphabet"}).json()] == ["GOOGL"]
 
 
 def test_search_includes_demo_companies(client):
-    assert client.get("/companies/search", params={"q": "northwind"}).json()[0]["ticker"] == "NWRC"
+    assert client.get("/companies/search", params={"q": "verizon"}).json()[0]["ticker"] == "VZ"
 
 
 def test_search_needs_a_query(client):
@@ -69,7 +69,7 @@ def test_start_debate_and_fetch_it(client):
 
 
 def test_start_debate_demo_ticker(client):
-    assert client.post("/debates", json={"ticker": "nwrc"}).status_code == 200
+    assert client.post("/debates", json={"ticker": "amc"}).status_code == 200
 
 
 def test_start_debate_rejects_bad_tickers(client):
