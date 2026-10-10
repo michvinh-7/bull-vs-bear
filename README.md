@@ -81,7 +81,7 @@ See [shared/README.md](shared/README.md) for the shapes, how ids connect them, t
 - **Every claim cites a source.** No citation means it's labeled Unsupported.
 - **API keys stay on the backend.** The browser never talks to Gemini or ElevenLabs.
 - **Test with text before voice.** Keep `VOICE_ENABLED=false` until the debate reads well.
-- **Deploy in the first two hours.** Frontend → Vercel (root `frontend/`), backend → Railway (root `backend/`, config `/backend/railway.json`).
+- **Deploy in the first two hours.** Frontend → Vercel (root `frontend/`), backend → Railway (root directory = repo root so `shared/` ships too, config `/backend/railway.json`).
 - **Cache every demo run.** If the network fails on stage, replay a saved debate.
 - **Cut, don't slip.** Drop in this order: voice interrupts, WebSockets (switch to generate-then-play), contradiction pass, topic tagging.
 
