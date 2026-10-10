@@ -6,7 +6,7 @@ export const LABEL_STYLE: Record<Label, string> = {
   verified: "border-verified/60 text-verified",
   contested: "border-contested/60 text-contested",
   unsupported: "border-unsupported/60 text-unsupported",
-  pending: "border-neutral-600 text-neutral-400",
+  pending: "border-muted-foreground/50 text-muted-foreground",
 };
 
 /** A claim's fact-check label, optionally followed by its citation. */

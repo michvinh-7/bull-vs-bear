@@ -9,6 +9,7 @@ import Mascot from "@/components/debate/Mascot";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Logo from "@/components/Logo";
+import { ThemeToggle } from "@/components/theme";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDebate } from "@/lib/api";
@@ -202,7 +203,10 @@ function Shell({ id, children }: { id: string; children: React.ReactNode }) {
     <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 pt-5 pb-16">
       <header className="flex items-center justify-between gap-3">
         <Logo />
-        <ReplayButton id={id} variant="ghost" />
+        <div className="flex items-center gap-1">
+          <ReplayButton id={id} variant="ghost" />
+          <ThemeToggle />
+        </div>
       </header>
       {children}
     </main>
