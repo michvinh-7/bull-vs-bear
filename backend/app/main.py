@@ -255,9 +255,10 @@ async def debate_socket(ws: WebSocket, debate_id: str):
 
 
 def _check_claims(claims, sheet):
-    """The fact-checker crashing never stops the debate: the claims stay "pending"."""
+    """The fact-checker crashing never stops the debate: the claims stay "pending".
+    Works on copies so a crash halfway through doesn't leave some claims labeled."""
     try:
-        return verify.check_claims(claims, sheet)
+        return verify.check_claims([c.model_copy() for c in claims], sheet)
     except Exception as e:
         print(f"[verify] fact-check failed, labels stay pending: {e}")
         return claims
