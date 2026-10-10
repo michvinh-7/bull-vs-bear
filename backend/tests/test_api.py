@@ -104,3 +104,29 @@ def test_websocket_replays_finished_debate(client):
     store.save_debate(Debate(id="d2", ticker="AAPL", status="done", brief=CommitteeBrief()))
     with client.websocket_connect("/ws/debates/d2") as ws:
         assert ws.receive_json()["type"] == "brief"
+
+
+@pytest.mark.parametrize("origin, allowed", [
+    ("http://localhost:3000", True),
+    ("https://bull-vs-bear.vercel.app", True),
+    ("https://bull-vs-bear-git-p3-frontend-team.vercel.app", True),  # Vercel preview link
+    ("https://evil.example.com", False),
+    ("https://vercel.app.evil.com", False),
+])
+def test_cors_allows_the_frontend_sites(client, origin, allowed):
+    r = client.options("/debates", headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
+    assert (r.headers.get("access-control-allow-origin") == origin) is allowed
+
+
+def test_saved_fact_sheet_is_used_instead_of_rebuilding(client, monkeypatch):
+    import json as _json
+    from pathlib import Path
+    from app import main
+    from app.schemas import FactSheet
+    sheet = FactSheet.model_validate(_json.loads(
+        (Path(__file__).resolve().parents[2] / "shared" / "examples" / "fact_sheet.json").read_text(encoding="utf-8")))
+    monkeypatch.setattr(store, "_fact_sheets", {"NWRC": sheet})
+    monkeypatch.setattr(main, "build_fact_sheet", lambda t: (_ for _ in ()).throw(AssertionError("rebuilt")))
+    store.save_debate(Debate(id="c1", ticker="NWRC", max_turns=2))
+    with client.websocket_connect("/ws/debates/c1") as ws:
+        assert ws.receive_json()["type"] == "fact_sheet"

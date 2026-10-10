@@ -7,7 +7,7 @@ import time
 
 import httpx
 
-from . import config, store
+from . import config, store, usage
 
 VOICES = {
     "bull": config.VOICE_ID_BULL,
@@ -50,6 +50,7 @@ def speak(text: str, speaker: str, debate_id: str, turn: int) -> str:
     audio = _tts(voice_id, text)
     if audio is None:
         return ""
+    usage.record_voice(text)  # ElevenLabs bills per character once the clip is made
     try:
         return store.upload_audio(audio, f"{debate_id}/{turn:02d}-{speaker}.mp3")
     except Exception as e:

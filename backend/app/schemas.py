@@ -137,6 +137,9 @@ DISCLAIMER = "This summarizes the debate. It is not investment advice."
 
 class StartDebateRequest(BaseModel):
     ticker: str
+    model: str | None = None  # one of usage.MODELS; server default if omitted
+    # The user's own Gemini key (Settings). Held in memory for this debate only; never stored or echoed.
+    gemini_api_key: str | None = Field(None, repr=False)
 
 
 class StartDebateResponse(BaseModel):
@@ -148,6 +151,8 @@ class Debate(BaseModel):
     ticker: str
     status: Literal["running", "done", "error"] = "running"
     max_turns: int = 8
+    model: str | None = None  # Gemini model this debate runs on
+    usage: "Usage | None" = None  # tokens, calls, voice characters and estimated cost so far
     fact_sheet: FactSheet | None = None
     positions: Positions | None = None
     lines: list[LineMessage] = Field(default_factory=list)
@@ -155,3 +160,8 @@ class Debate(BaseModel):
 
     def claim(self, claim_id: str) -> Claim | None:
         return next((c for line in self.lines for c in line.claims if c.id == claim_id), None)
+
+
+from .usage import Usage  # noqa: E402  (usage.py imports nothing from here; placed last to keep shapes first)
+
+Debate.model_rebuild()

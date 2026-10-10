@@ -1,5 +1,6 @@
-import type { CommitteeBrief, Debate } from "./types";
+import type { CommitteeBrief, Debate, ModelsResponse } from "./types";
 import { mockDebate } from "./mock";
+import { mockModels } from "./mock/models";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
@@ -17,15 +18,31 @@ export async function errorFrom(res: Response, fallback: string): Promise<Error>
   return new Error(`${fallback} (${res.status})`);
 }
 
-export async function startDebate(ticker: string): Promise<string> {
+export interface StartOptions {
+  model?: string | null; // a ModelOption id; server default if omitted
+  apiKey?: string | null; // the user's own Gemini key, sent only to our backend
+}
+
+export async function startDebate(ticker: string, opts: StartOptions = {}): Promise<string> {
   if (USE_MOCK) return "mock";
   const res = await fetch(`${API_URL}/debates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker }),
+    body: JSON.stringify({
+      ticker,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.apiKey ? { gemini_api_key: opts.apiKey } : {}),
+    }),
   });
   if (!res.ok) throw await errorFrom(res, "Couldn’t start the debate");
   return (await res.json()).debate_id;
+}
+
+export async function getModels(): Promise<ModelsResponse> {
+  if (USE_MOCK) return mockModels;
+  const res = await fetch(`${API_URL}/models`);
+  if (!res.ok) throw await errorFrom(res, "Couldn’t load models");
+  return res.json();
 }
 
 export async function getDebate(id: string): Promise<Debate> {

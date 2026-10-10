@@ -65,12 +65,31 @@ Set `NEXT_PUBLIC_USE_MOCK=false` to talk to the real backend.
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/health` | `{ok: true}` |
+| GET | `/health` | `{ok: true}` plus which services are configured |
 | GET | `/companies` | pre-cached demo companies |
-| POST | `/debates` `{ticker}` | `{debate_id}` |
-| GET | `/debates/{id}` | full debate for replay |
+| GET | `/companies/search?q=` | up to 10 matching companies |
+| GET | `/models` | Gemini models the user can pick, with prices |
+| POST | `/debates` `{ticker, model?, gemini_api_key?}` | `{debate_id}` |
+| GET | `/debates/{id}` | full debate for replay, including `model` and `usage` |
 | GET | `/debates/{id}/brief` | committee brief |
-| WS | `/ws/debates/{id}` | streams `fact_sheet`, `positions`, `turn_start` + `line` per turn, `brief`; accepts `{type: "interrupt", question}` |
+| WS | `/ws/debates/{id}` | streams `fact_sheet`, `positions`, `turn_start` + `line` per turn, `usage`, `brief`; accepts `interrupt` and `played` |
+
+## Settings: model, your own key, and usage
+
+The gear icon on every page opens Settings.
+
+- **Gemini model.** Flash (default), Flash-Lite or Pro, listed by `GET /models` with prices. Applies to the next debate.
+  Pro needs a key with Pro access and is slow (about 45 s to the first line), so use Flash for live demos.
+- **Your own Gemini API key** (optional). The browser keeps it in `sessionStorage` (this tab only) and sends it
+  only to our backend with `POST /debates`. The backend holds it in memory for that one debate and drops it when
+  the debate ends; it's never saved, logged or returned. ElevenLabs voices still use the team's key.
+- **Usage.** Every Gemini call and voice clip in a debate is counted (`backend/app/usage.py`): calls, input,
+  output and thinking tokens, voice characters, and an estimated cost. The live debate shows "This debate";
+  finished debates add to "All debates in this browser" (`localStorage`, resettable). Costs use Google's
+  published prices (thinking billed as output), recorded in `usage.MODELS` with the date they were checked.
+  **Update those prices when Google changes them** (Flash's introductory price ends Dec 31, 2026).
+
+A real 8-line debate on Flash-Lite made 19 Gemini calls (rejected lines are retried) and cost about $0.02.
 
 ## Shared data shapes
 

@@ -1,3 +1,5 @@
+# CPU-only PyTorch: Linux torch from PyPI bundles CUDA (~2.5 GB) that Railway has no GPU for.
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi>=0.115
 uvicorn[standard]>=0.30
 pydantic>=2.8

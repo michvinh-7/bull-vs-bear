@@ -4,18 +4,22 @@ Endpoints
   GET  /health                  liveness check for Railway
   GET  /companies               the pre-cached demo companies
   GET  /companies/search?q=     up to 10 companies matching a name or ticker
-  POST /debates                 start a debate -> {debate_id}; 400 empty, 404 unknown ticker
+  GET  /models                  Gemini models the user can pick in Settings, with prices
+  POST /debates                 start a debate -> {debate_id}; 400 empty/unknown model, 404 unknown ticker
   GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
   GET  /debates/{id}/brief      committee brief only
   WS   /ws/debates/{id}         streams the debate; accepts interrupts
 """
 import asyncio
+import threading
+import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import agents, companies, config, store, verify, voice
+from . import agents, companies, config, store, usage, verify, voice
 from .companies import Company
 from .facts import build_fact_sheet
 from .pacing import Pacer
@@ -26,11 +30,49 @@ from .schemas import (
     StartDebateResponse,
 )
 
-app = FastAPI(title="Bull vs Bear")
+# ---- Fact-check model warm-up ----
+# The NLI model takes a while to download and load. Loading it the first time a
+# claim needs checking stalled live debates for minutes, so it loads in the
+# background at startup and lines go out "pending" until it's ready.
+fact_check = {"state": "idle"}  # idle -> loading -> ready | failed; "off" when FACT_CHECK=false
+_warm_lock = threading.Lock()
+
+
+def _warm_up_fact_check() -> None:
+    with _warm_lock:
+        if fact_check["state"] != "idle":
+            return
+        fact_check["state"] = "loading"
+    start = time.monotonic()
+    try:
+        verify.nli("The term loan matures in 2028.", "The loan matures in 2028.")
+        fact_check["state"] = "ready"
+        print(f"[verify] fact-check model ready in {time.monotonic() - start:.0f}s")
+    except Exception as e:
+        fact_check["state"] = "failed"
+        print(f"[verify] fact-check model failed to load, labels stay pending: {e}")
+
+
+def start_fact_check_warm_up() -> None:
+    if not config.FACT_CHECK:
+        fact_check["state"] = "off"
+        return
+    threading.Thread(target=_warm_up_fact_check, daemon=True).start()
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    start_fact_check_warm_up()
+    yield
+
+
+app = FastAPI(title="Bull vs Bear", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[config.FRONTEND_ORIGIN, "http://localhost:3000"],
+    # FRONTEND_ORIGIN can list several sites (comma-separated), e.g. the custom domain.
+    allow_origins=[o.strip() for o in config.FRONTEND_ORIGIN.split(",") if o.strip()] + ["http://localhost:3000"],
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",  # the Vercel site and its preview links
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -43,6 +85,7 @@ def health():
         "gemini": {"model": config.GEMINI_MODEL, "key": "set" if config.GEMINI_API_KEY else "missing"},
         "voice": config.VOICE_ENABLED,
         "storage": "supabase" if store._client else "memory",
+        "fact_check": fact_check["state"],
     }
 
 
@@ -56,15 +99,41 @@ def search_companies(q: str = Query(..., min_length=1, max_length=50)):
     return companies.search(q)
 
 
+@app.get("/models")
+def list_models():
+    return usage.models_payload()
+
+
+# Users' own Gemini keys, by debate id: memory only, dropped when the debate ends
+# (or after an hour if it never starts). Never saved, logged or returned.
+_user_keys: dict[str, tuple[str, float]] = {}
+KEY_TTL_SECONDS = 3600
+
+
+def _forget_stale_keys() -> None:
+    cutoff = time.monotonic() - KEY_TTL_SECONDS
+    for debate_id in [d for d, (_, t) in _user_keys.items() if t < cutoff]:
+        _user_keys.pop(debate_id, None)
+
+
 @app.post("/debates", response_model=StartDebateResponse)
 def start_debate(req: StartDebateRequest):
     ticker = req.ticker.strip().upper()
     if not ticker:
         raise HTTPException(400, "Ticker is required")
+    model = req.model or config.GEMINI_MODEL
+    if req.model and req.model not in usage.MODELS:
+        raise HTTPException(400, f"Unknown model {req.model}. Choose one of: {', '.join(usage.MODELS)}")
+    key = (req.gemini_api_key or "").strip() or None
+    if key and (len(key) < 20 or len(key) > 200 or any(c.isspace() for c in key)):
+        raise HTTPException(400, "That doesn't look like a Gemini API key")
     if not companies.is_known(ticker):
         raise HTTPException(404, f"No public company with ticker {ticker}")
-    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS)
+    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS, model=model, usage=usage.Usage(model=model))
     store.save_debate(debate)
+    _forget_stale_keys()
+    if key:
+        _user_keys[debate.id] = (key, time.monotonic())
     return StartDebateResponse(debate_id=debate.id)
 
 
@@ -93,6 +162,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
          {"type": "line",       "data": LineMessage}                             (labels + audio ready)
          ... turn_start / line repeat ...
          {"type": "brief",      "data": CommitteeBrief}
+         {"type": "usage",      "data": Usage}       (after positions, each line and the brief)
          {"type": "error",      "message": str}
        Client -> server messages:
          {"type": "interrupt", "question": str}
@@ -124,16 +194,29 @@ async def debate_socket(ws: WebSocket, debate_id: str):
     pacer = Pacer()
     listener = asyncio.create_task(_listen(ws, interrupts, pacer))
 
+    # Count every Gemini call and voice clip for this debate, using the user's key if they gave one.
+    debate.model = debate.model or config.GEMINI_MODEL
+    debate.usage = debate.usage or usage.Usage(model=debate.model)
+    key = _user_keys.get(debate.id, (None, 0))[0]
+    ctx_token = usage.enter(usage.DebateContext(model=debate.model, usage=debate.usage, api_key=key))
+
+    async def send_usage():
+        await ws.send_json({"type": "usage", "data": debate.usage.model_dump()})
+
     async def pace(wake: asyncio.Queue | None = None, at_most: int = 1):
         """Hold until the listener is at most `at_most` lines behind (or a question arrives on `wake`)."""
         if config.PACING:
             await pacer.wait(at_most, wake)
 
     try:
-        debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
+        # Demo companies are pre-built (scripts/cache_fact_sheets.py) so the debate starts at once.
+        debate.fact_sheet = store.load_fact_sheet(debate.ticker) or await asyncio.to_thread(
+            build_fact_sheet, debate.ticker
+        )
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
         debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
         await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
+        await send_usage()
 
         sheet = debate.fact_sheet
         planned = debate.max_turns + 1  # analyst lines + the halfway question; shown as "Turn x of y"
@@ -149,7 +232,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             if line is None:  # Gemini broke the rules twice: drop the turn, never show broken data
                 return False
             claims, audio_url = await asyncio.gather(
-                asyncio.to_thread(_check_claims, line.claims, sheet),
+                _fact_check_in_time(line.claims, sheet),
                 asyncio.to_thread(_speak, line.text, line.speaker, debate.id, line.turn)
                 if config.VOICE_ENABLED
                 else asyncio.sleep(0, result=""),
@@ -158,6 +241,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             debate.lines.append(line)
             store.save_debate(debate)
             await ws.send_json({"type": "line", "data": line.model_dump()})
+            await send_usage()
             pacer.sent(line.turn, line.text)
             return True
 
@@ -171,6 +255,11 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             # quietly finishing with no lines.
             api_failures = api_failures + 1 if line is None and agents.last_error else 0
             if api_failures >= 2:
+                if key and agents.key_rejected(agents.last_error):
+                    raise RuntimeError(
+                        f"Your Gemini API key was rejected for {debate.model} ({agents.last_error}). "
+                        "Check it in Settings, or remove it to use the default."
+                    )
                 raise RuntimeError(
                     f"The debate engine is unavailable right now ({agents.last_error}). "
                     "Try again in a minute, or replay a saved debate."
@@ -239,6 +328,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         debate.brief = await brief
         debate.status = "done"
         store.save_debate(debate)
+        await send_usage()
         await ws.send_json({"type": "brief", "data": debate.brief.model_dump()})
     except WebSocketDisconnect:
         pass
@@ -252,6 +342,22 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             pass  # the client already left
     finally:
         listener.cancel()
+        usage.leave(ctx_token)
+        _user_keys.pop(debate.id, None)  # the user's key is gone once the debate ends
+
+
+async def _fact_check_in_time(claims, sheet):
+    """Labels if the model is ready and answers within FACT_CHECK_TIMEOUT; otherwise the
+    line goes out on time with its claims "pending". Never holds up the debate."""
+    if fact_check["state"] != "ready":
+        if fact_check["state"] == "idle":
+            start_fact_check_warm_up()  # e.g. a script that didn't run the startup hook
+        return claims
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(_check_claims, claims, sheet), config.FACT_CHECK_TIMEOUT)
+    except asyncio.TimeoutError:
+        print(f"[verify] fact-check took over {config.FACT_CHECK_TIMEOUT:.0f}s, labels stay pending")
+        return claims
 
 
 def _check_claims(claims, sheet):

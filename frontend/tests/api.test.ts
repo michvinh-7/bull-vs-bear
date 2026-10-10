@@ -17,3 +17,27 @@ describe("errorFrom", () => {
     expect(err.message).toBe("Debate not found (502)");
   });
 });
+
+describe("startDebate", () => {
+  const ok = () => new Response(JSON.stringify({ debate_id: "abc" }), { status: 200 });
+
+  it("sends the model and the user's key only when set", async () => {
+    const { startDebate } = await import("@/lib/api");
+    const calls: RequestInit[] = [];
+    const fetchMock = async (_: unknown, init?: RequestInit) => (calls.push(init!), ok());
+    const real = globalThis.fetch;
+    globalThis.fetch = fetchMock as typeof fetch;
+    try {
+      await startDebate("nwrc");
+      await startDebate("nwrc", { model: "gemini-3.5-flash-lite", apiKey: "AIzaUserOwnKey_0123456789abcdef" });
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(JSON.parse(calls[0].body as string)).toEqual({ ticker: "nwrc" });
+    expect(JSON.parse(calls[1].body as string)).toEqual({
+      ticker: "nwrc",
+      model: "gemini-3.5-flash-lite",
+      gemini_api_key: "AIzaUserOwnKey_0123456789abcdef",
+    });
+  });
+});

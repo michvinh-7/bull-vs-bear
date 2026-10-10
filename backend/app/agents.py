@@ -11,7 +11,7 @@ Who decides what:
   - Gemini only writes the words, citing source ids from the fact sheet.
   - Gemini never does math and never recommends a trade.
 
-Without GEMINI_API_KEY every function replays the shared examples, so the
+Without a Gemini key (the server's or the user's own) every function replays the shared examples, so the
 frontend and tests run with no key.
 """
 import json
@@ -22,7 +22,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, ValidationError, create_model
 
-from . import config
+from . import config, usage
 from .schemas import (
     AgreedPoint,
     Claim,
@@ -440,29 +440,64 @@ def validate_positions(out: dict, fact_sheet: FactSheet) -> list[str]:
 
 # ---- Gemini call (tests swap `_generate`) ----
 
-_client = None
+_server_client = None  # the team's key; users' own keys get a client that lives on their debate only
 last_error: str | None = None  # Google's reason for the latest failed call (never contains the key)
 
 
-def _generate(system: str, user: str, schema: type[BaseModel], temperature: float, thinking: str = "minimal") -> dict:
-    global _client
+def has_key() -> bool:
+    """A Gemini key is available: the user's own (Settings) or the server's."""
+    ctx = usage.current()
+    return bool((ctx and ctx.api_key) or config.GEMINI_API_KEY)
+
+
+def _client_for(ctx):
+    """The team's client is shared. A user's own key gets a client stored on their debate's
+    context, so it's gone with the debate: no module-level cache ever holds a user's key."""
+    global _server_client
     from google import genai
     from google.genai import types
 
-    if _client is None:
+    def make(api_key: str):
         # A stuck call fails after 20 s instead of freezing the debate.
-        _client = genai.Client(api_key=config.GEMINI_API_KEY, http_options=types.HttpOptions(timeout=20_000))
-    resp = _client.models.generate_content(
-        model=config.GEMINI_MODEL,
+        return genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=20_000))
+
+    if ctx is not None and ctx.api_key:
+        if getattr(ctx, "client", None) is None:
+            ctx.client = make(ctx.api_key)
+        return ctx.client
+    if _server_client is None:
+        _server_client = make(config.GEMINI_API_KEY)
+    return _server_client
+
+
+def key_rejected(error: str | None) -> bool:
+    """Google refused the API key itself (wrong, revoked, no access), not a busy server."""
+    e = (error or "").lower()
+    return any(s in e for s in ("api key not valid", "api_key_invalid", "permission_denied", "401", "403"))
+
+
+def _generate(system: str, user: str, schema: type[BaseModel], temperature: float, thinking: str = "minimal") -> dict:
+    from google.genai import types
+
+    # The debate's model and key (picked in Settings), else the server defaults.
+    ctx = usage.current()
+    model = ctx.model if ctx else config.GEMINI_MODEL
+    client = _client_for(ctx)
+    resp = client.models.generate_content(
+        model=model,
         contents=user,
         config=types.GenerateContentConfig(
             system_instruction=system,
             temperature=temperature,
             response_mime_type="application/json",
             response_schema=schema,
-            thinking_config=types.ThinkingConfig(thinking_level=thinking),  # minimal for live turns: speed
+            # minimal for live turns: speed (raised to the model's floor; Pro needs "low")
+            thinking_config=types.ThinkingConfig(thinking_level=usage.thinking_for(model, thinking)),
+            # Pro always thinks, so it gets longer before a call counts as stuck.
+            http_options=types.HttpOptions(timeout=60_000) if usage.thinking_for(model, "minimal") != "minimal" else None,
         ),
     )
+    usage.record_gemini(resp)
     return json.loads(resp.text)
 
 
@@ -557,7 +592,7 @@ def to_line(text: str, claims: list[dict], speaker: str, turn: int, from_user: b
 
 def generate_positions(fact_sheet: FactSheet) -> Positions:
     """Thesis + 3 cited points per side for the side panels."""
-    if not config.GEMINI_API_KEY:
+    if not has_key():
         return Positions.model_validate(_example("positions.json"))
     ids = [s.id for s in fact_sheet.sources]
     out = _call(
@@ -580,7 +615,7 @@ def generate_turn(
     """One bull or bear line. `question` is a moderator or user question to
     answer. `target` is the claim to engage: "auto" picks the opponent's
     strongest latest claim, None means nothing to rebut. None if dropped."""
-    if not config.GEMINI_API_KEY:
+    if not has_key():
         return _example_turn(speaker, turn)
     if target == "auto":
         target = pick_target(history, speaker)
@@ -608,7 +643,7 @@ def cross_examine(fact_sheet: FactSheet, history: list[LineMessage], turn: int) 
     claims = [(line.speaker, c) for line in history for c in line.claims]
     if not claims:
         return None
-    if not config.GEMINI_API_KEY:
+    if not has_key():
         speaker, claim = claims[-1]
         text = f"{speaker.title()}, the filing is the only thing that counts here. What backs up your point that {claim.text[0].lower() + claim.text[1:].rstrip('.')}?"
         return to_line(text, [], "moderator", turn), speaker, claim
@@ -650,7 +685,7 @@ def write_brief(fact_sheet: FactSheet, lines: list[LineMessage]) -> CommitteeBri
     If Gemini fails, the brief still has the unsupported list (never the sample,
     which is about a different company)."""
     unsupported = unsupported_claims(lines)
-    if not config.GEMINI_API_KEY:
+    if not has_key():
         raw = _example("committee_brief.json")
         return CommitteeBrief(
             agreed=[AgreedPoint.model_validate(x) for x in raw["agreed"]],

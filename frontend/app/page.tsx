@@ -8,11 +8,14 @@ import ClaimBadge from "@/components/ClaimBadge";
 import CompanySearch from "@/components/CompanySearch";
 import Mascot from "@/components/debate/Mascot";
 import Logo from "@/components/Logo";
+import SettingsSheet from "@/components/SettingsSheet";
+import { ThemeToggle } from "@/components/theme";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { startDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
+import { getApiKey, getModel } from "@/lib/settings";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
 import type { Label } from "@/lib/types";
 
@@ -30,7 +33,7 @@ export default function Home() {
     unlockAudio(); // must run inside the click, before any await
     setStarting(t.trim().toUpperCase());
     try {
-      const id = await startDebate(t.trim());
+      const id = await startDebate(t.trim(), { model: getModel(), apiKey: getApiKey() });
       router.push(`/debate/${id}`);
     } catch (e) {
       toast.error("Couldn’t start the debate", { description: (e as Error).message });
@@ -47,9 +50,13 @@ export default function Home() {
       <div className="relative mx-auto flex max-w-5xl flex-col gap-20 px-4 pt-6 pb-16">
         <nav className="flex items-center justify-between">
           <Logo />
-          <Button variant="ghost" size="sm" asChild>
-            <a href="#how">How it works</a>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" asChild>
+              <a href="#how">How it works</a>
+            </Button>
+            <SettingsSheet />
+            <ThemeToggle />
+          </div>
         </nav>
 
         {/* Hero */}
@@ -112,7 +119,7 @@ export default function Home() {
             </ul>
           </div>
 
-          <Card className="gap-3 p-4 shadow-2xl shadow-black/40">
+          <Card className="gap-3 p-4 shadow-2xl shadow-black/10 dark:shadow-black/40">
             <PreviewBubble
               side="bull"
               text="Leverage looks high at 5.8x, but the term loan is secured by owned stores. Lenders get paid first."
@@ -155,7 +162,7 @@ function LegendRow({ label, text }: { label: Label; text: string }) {
   return (
     <li className="flex items-center gap-3">
       <ClaimBadge label={label} className="w-24" />
-      <span className="text-neutral-300">{text}</span>
+      <span className="text-foreground/85">{text}</span>
     </li>
   );
 }
