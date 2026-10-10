@@ -13,14 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ClaimBadge from "@/components/ClaimBadge";
+import { USE_MOCK } from "@/lib/api";
 import { formatMetric, metricsMentioned } from "@/lib/format";
+import { closedReason, MAX_QUESTIONS, serverFinished } from "@/lib/questions";
 import type { Label, Metric, Side } from "@/lib/types";
 import { useDebate } from "@/lib/useDebate";
 import { usePlayback } from "@/lib/usePlayback";
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion } = useDebate(id);
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay } = useDebate(id);
   const play = usePlayback(lines);
   const [question, setQuestion] = useState("");
   const [selected, setSelected] = useState<SelectedClaim | null>(null);
@@ -46,6 +48,17 @@ export default function DebateRoom() {
 
   // Always bring the closing card into view when the debate ends.
   const done = play.finished && !!brief;
+
+  // Why the interrupt bar is closed, if it is. The backend writes ahead of the audio,
+  // so it can stop taking questions before the audience hears the last line.
+  const questionsAsked = lines.filter((l) => l.from_user).length + (pendingQuestion ? 1 : 0);
+  const reason = closedReason({
+    replay,
+    done,
+    serverFinished: !USE_MOCK && serverFinished({ brief: !!brief, lines: lines.length, maxTurns, thinking: !!thinking }),
+    asked: questionsAsked,
+    waiting: !!waitingQuestion,
+  });
   useEffect(() => {
     const el = floorRef.current;
     if (done && el) setTimeout(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }), 100);
@@ -152,20 +165,20 @@ export default function DebateRoom() {
             className="flex gap-2 border-t p-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!question.trim() || waitingQuestion || done) return;
+              if (!question.trim() || reason) return;
               interrupt(question.trim());
               setQuestion("");
             }}
           >
-            <Button type="submit" className="rounded-full bg-unsupported text-black hover:bg-unsupported/90" disabled={!!waitingQuestion || done}>
+            <Button type="submit" className="rounded-full bg-unsupported text-black hover:bg-unsupported/90" disabled={!!reason}>
               <Mic /> Interrupt
             </Button>
             <Input
               className="rounded-full"
-              placeholder={done ? "The debate has ended" : waitingQuestion ? "Waiting for the committee…" : "Ask the committee a question…"}
+              placeholder={reason ?? `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              disabled={!!waitingQuestion || done}
+              disabled={!!reason}
             />
           </form>
         </Card>

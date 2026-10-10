@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "sync-shapes": "cp ../shared/examples/*.json lib/mock/"
+    "sync-shapes": "cp ../shared/examples/*.json lib/mock/",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -24,8 +26,10 @@
     "@types/node": "22.20.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "jsdom": "30.1.1",
     "shadcn": "4.21.0",
     "tailwindcss": "4.3.3",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
   }
 }

@@ -2,15 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Loader2, Search } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import ClaimBadge from "@/components/ClaimBadge";
+import CompanySearch from "@/components/CompanySearch";
 import Mascot from "@/components/debate/Mascot";
 import Logo from "@/components/Logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { startDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
@@ -18,7 +18,6 @@ import type { Label } from "@/lib/types";
 
 export default function Home() {
   const router = useRouter();
-  const [ticker, setTicker] = useState("");
   const [companies, setCompanies] = useState<DemoCompany[]>(MOCK_COMPANIES);
   const [starting, setStarting] = useState<string | null>(null);
 
@@ -67,28 +66,7 @@ export default function Home() {
             came from.
           </p>
 
-          <form
-            className="flex w-full max-w-xl flex-col gap-2 sm:flex-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              go(ticker);
-            }}
-          >
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="h-12 rounded-xl bg-card pl-10 text-base"
-                placeholder="Company name or ticker"
-                aria-label="Company name or ticker"
-                value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
-              />
-            </div>
-            <Button type="submit" size="lg" className="h-12 rounded-xl px-5 text-base font-semibold" disabled={!!starting}>
-              {starting && starting === ticker.trim().toUpperCase() ? <Loader2 className="animate-spin" /> : null}
-              Start debate
-            </Button>
-          </form>
+          <CompanySearch onPick={go} busy={!!starting} />
         </section>
 
         {/* Demo companies */}

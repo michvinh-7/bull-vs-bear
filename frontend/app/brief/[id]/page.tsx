@@ -213,7 +213,7 @@ function Shell({ id, children }: { id: string; children: React.ReactNode }) {
 function ReplayButton({ id, variant = "default" }: { id: string; variant?: "default" | "ghost" }) {
   return (
     <Button asChild variant={variant} size={variant === "ghost" ? "sm" : "default"}>
-      <Link href={`/debate/${id}`} onClick={unlockAudio}>
+      <Link href={`/debate/${id}?replay=1`} onClick={unlockAudio}>
         <RotateCcw /> Replay debate
       </Link>
     </Button>

@@ -55,6 +55,8 @@ cd frontend
 npm install
 cp .env.local.example .env.local   # NEXT_PUBLIC_USE_MOCK=true runs without a backend
 npm run dev                        # http://localhost:3000
+npm test                           # unit tests (Vitest)
+npm run typecheck
 ```
 
 Set `NEXT_PUBLIC_USE_MOCK=false` to talk to the real backend.
