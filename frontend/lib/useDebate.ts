@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { USE_MOCK, wsUrl } from "./api";
+import { getDebate, USE_MOCK, wsUrl } from "./api";
 import { mockDebate } from "./mock";
 import type { CommitteeBrief, FactSheet, LineMessage, Positions, ServerMessage, Speaker } from "./types";
 
@@ -24,6 +24,8 @@ export function useDebate(debateId: string) {
   // A question the user just sent, shown right away until the committee's
   // moderator line for it arrives.
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  // Replays stream a finished debate from storage; the server isn't taking questions.
+  const [replay, setReplay] = useState(false);
 
   const handle = useCallback(
     (msg: ServerMessage) => {
@@ -55,6 +57,11 @@ export function useDebate(debateId: string) {
     },
     [],
   );
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("replay") === "1") setReplay(true);
+    else if (!USE_MOCK) getDebate(debateId).then((d) => setReplay(d.status === "done")).catch(() => {});
+  }, [debateId]);
 
   useEffect(() => {
     if (USE_MOCK) {
@@ -101,5 +108,5 @@ export function useDebate(debateId: string) {
     [handle],
   );
 
-  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion };
+  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay };
 }
