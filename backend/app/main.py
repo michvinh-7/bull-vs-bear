@@ -120,10 +120,10 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             await ws.send_json({"type": "turn_start", "turn": turn, "speaker": speaker, "max_turns": planned})
             return turn
 
-        async def emit(line):
+        async def emit(line) -> bool:
             """Fact-check and voice in parallel, save, then send the line complete."""
             if line is None:  # Gemini broke the rules twice: drop the turn, never show broken data
-                return
+                return False
             claims, audio_url = await asyncio.gather(
                 asyncio.to_thread(verify.check_claims, line.claims, sheet),
                 asyncio.to_thread(voice.speak, line.text, line.speaker, debate.id, line.turn)
@@ -134,12 +134,14 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             debate.lines.append(line)
             store.save_debate(debate)
             await ws.send_json({"type": "line", "data": line.model_dump()})
+            return True
 
-        async def analyst(side: str, question: str | None = None, target="auto"):
+        async def analyst(side: str, question: str | None = None, target="auto") -> bool:
             turn = await start(side)
-            await emit(await asyncio.to_thread(agents.generate_turn, sheet, debate.lines, side, turn, question, target))
+            return await emit(await asyncio.to_thread(agents.generate_turn, sheet, debate.lines, side, turn, question, target))
 
         next_side, spoken, cross_examined = "bull", 0, False
+        redos = 2  # a dropped turn gets a fresh try, so one side doesn't speak twice in a row
         while spoken < debate.max_turns:
             if not interrupts.empty():
                 question = interrupts.get_nowait()
@@ -162,7 +164,9 @@ async def debate_socket(ws: WebSocket, debate_id: str):
                     continue
                 planned -= 1  # moderator dropped: no extra line after all
 
-            await analyst(next_side)
+            if not await analyst(next_side) and redos:
+                redos -= 1
+                continue
             next_side, spoken = _other(next_side), spoken + 1
 
         debate.brief = await asyncio.to_thread(agents.write_brief, debate.fact_sheet, debate.lines)

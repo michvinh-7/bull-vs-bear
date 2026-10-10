@@ -102,6 +102,32 @@ def test_numbers_must_come_from_cited_sources(gemini):
     assert "['62']" in prompts[2]
 
 
+def test_spelled_out_numbers_are_rejected(gemini):
+    replies, prompts = gemini
+    replies += [{**GOOD_BULL, "text": "The four hundred sixteen million dollar loan is secured. Lenders sit first."}, GOOD_BULL]
+    agents.generate_turn(SHEET, [], "bull", 1)
+    assert "spelled out" in prompts[1]
+
+
+def test_python_metrics_may_be_quoted_in_display_form(gemini):
+    replies, _ = gemini
+    replies.append({"text": "Liquidity is $410 million. That covers a lot.",
+                    "claims": [{"text": "Liquidity is $410 million.", "source_id": "S4",
+                                "quote": "$110 million of cash and $300 million available"}]})
+    assert agents.generate_turn(SHEET, [], "bull", 1) is not None
+
+
+def test_same_side_cannot_repeat_a_fact_in_new_words(gemini):
+    replies, prompts = gemini
+    history = [line("bull", 1, [("Northwind had $110 million of cash.", "S4", "verified")])]
+    again = {"text": "They hold $110 million of cash. That is real cushion.",
+             "claims": [{"text": "Northwind held $110 million of cash at quarter end.", "source_id": "S4",
+                         "quote": "we had $110 million of cash"}]}
+    replies += [again, GOOD_BULL]
+    agents.generate_turn(SHEET, history, "bull", 3, target=None)
+    assert "repeats a fact" in prompts[1]
+
+
 def test_rebuttal_must_engage_the_target(gemini):
     replies, prompts = gemini
     history = [line("bull", 1, [("The term loan is secured by owned real property.", "S1", "pending")])]
@@ -219,6 +245,21 @@ def test_user_interrupt_is_relayed_then_both_sides_answer(client, monkeypatch):
     assert (lines[0]["speaker"], lines[0]["from_user"], lines[0]["text"]) == ("moderator", True, "Why does floating-rate debt matter?")
     assert [l["speaker"] for l in lines[1:3]] == ["bull", "bear"]  # side that was due answers first
     assert len(lines) == 6 and max(m["max_turns"] for m in msgs if m["type"] == "turn_start") == 6
+
+
+def test_dropped_turn_gets_a_fresh_try_from_the_same_side(client, monkeypatch):
+    real, calls = agents.generate_turn, []
+
+    def flaky(sheet, history, side, turn, question=None, target="auto"):
+        calls.append(side)
+        return None if len(calls) == 2 else real(sheet, history, side, turn, question, target)
+
+    monkeypatch.setattr(agents, "generate_turn", flaky)
+    store.save_debate(Debate(id="d4", ticker="NWRC", max_turns=4))
+    msgs = run(client, "d4")
+    assert calls[:3] == ["bull", "bear", "bear"]
+    analysts = [s for s, _ in speakers(msgs) if s != "moderator"]
+    assert analysts.count("bull") == analysts.count("bear") == 2
 
 
 def test_interrupts_are_capped(client, monkeypatch):

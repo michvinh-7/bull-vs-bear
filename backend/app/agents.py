@@ -74,8 +74,11 @@ HARD RULES. Code checks your output; breaking any rule rejects the turn.
    - "quote": 3 to 15 words copied EXACTLY from that source's excerpt that prove the claim.
    Opinions ("that worries me") may appear in "text" but are never claims.
 3. ONLY KNOWN NUMBERS. Every number you say must appear in a source or metric
-   you cite this turn, or in TARGET_CLAIM. Never compute, estimate, round,
-   project or invent a number. No hypotheticals with new numbers.
+   you cite this turn, or in TARGET_CLAIM. Never add, subtract, combine,
+   estimate, round, project or invent a number: computed figures are already
+   in METRICS (cite one of its source_ids to use it). Write numbers as digits,
+   the way they appear in SOURCES or METRICS ($416 million, 62%, 5.8x, 2028),
+   never spelled out in words.
 4. ANSWER THE OTHER SIDE. When TARGET_CLAIM is given, your FIRST sentence
    responds to it directly and reuses its key number or term. If it is the
    other side's claim, contradict it with a fact, outweigh it with a bigger
@@ -86,7 +89,8 @@ HARD RULES. Code checks your output; breaking any rule rejects the turn.
    to them plainly; they may not know finance terms.
 6. NO TRADE CALLS. Never say buy, sell, short, go long, recommend, or anything
    telling the listener what to do with money. You argue; the human decides.
-7. NO REPEATS. Never repeat a claim from TRANSCRIPT. Bring a new fact or angle.
+7. NO REPEATS. Never repeat a fact you already used in TRANSCRIPT, even in new
+   words. Bring a new fact or a new angle every turn.
 """
 
 SYSTEM_PROMPTS = {
@@ -128,7 +132,8 @@ case (the debt is riskier than it looks).
 
 For each side: "thesis" is 1 to 2 plain sentences; "points" are exactly 3 short
 phrases (at most 12 words each), each citing ONE source id from SOURCES.
-Every number must appear in that source or in METRICS. Never compute numbers.
+Every number must appear in that source or in METRICS, written as digits the
+same way ($410 million, 62%, 5.8x, 2028). Never compute numbers.
 Never say buy, sell, short or recommend.
 """,
 }
@@ -186,6 +191,37 @@ def numbers(text: str) -> set[str]:
     return out
 
 
+_SPELLED = re.compile(
+    r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
+    r"sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)"
+    r"[\s-]+(?:\w+[\s-]+){0,3}?(?:hundred|thousand|million|billion|percent|basis points?)\b",
+    re.IGNORECASE,
+)
+
+
+def money(usd: float) -> str:
+    """410000000 -> '$410 million', 1800000000 -> '$1.8 billion'."""
+    for size, word in ((1e9, "billion"), (1e6, "million")):
+        if abs(usd) >= size:
+            return f"${usd / size:.1f}".rstrip("0").rstrip(".") + f" {word}"
+    return f"${usd:,.0f}"
+
+
+def show_metric(value: float, unit: str) -> str:
+    """How a metric is said aloud: 5.8x, 62%, 2028, $410 million."""
+    if unit == "usd":
+        return money(value)
+    if unit == "year":
+        return str(int(value))
+    return f"{value:g}" + {"x": "x", "pct": "%"}.get(unit, "")
+
+
+def same_fact(a: str, b: str) -> bool:
+    """Two claims say the same thing if most of their content words overlap."""
+    wa, wb = content_words(a) | numbers(a), content_words(b) | numbers(b)
+    return bool(wa and wb) and len(wa & wb) / len(wa | wb) >= 0.6
+
+
 def norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
@@ -199,16 +235,17 @@ def _number_text(fact_sheet: FactSheet, source_ids: set[str] | None = None) -> s
     parts = [s.excerpt for s in fact_sheet.sources if source_ids is None or s.id in source_ids]
     for m in fact_sheet.metrics:
         if source_ids is None or set(m.source_ids) & source_ids:
-            parts += [str(m.value), m.formula]
+            parts += [show_metric(m.value, m.unit), m.formula]
     for d in fact_sheet.debt:
         if source_ids is None or d.source_id in source_ids:
-            parts += [d.rate, str(d.maturity_year)]
+            parts += [money(d.amount_usd), d.rate, str(d.maturity_year)]
     return " ".join(parts)
 
 # ---- Validators: each returns plain-English errors; empty means pass ----
 
 def validate_turn(
-    out: dict, fact_sheet: FactSheet, history: list[LineMessage], target: Claim | None, question: str | None
+    out: dict, fact_sheet: FactSheet, history: list[LineMessage], target: Claim | None, question: str | None,
+    speaker: str = "",
 ) -> list[str]:
     errs: list[str] = []
     text = out.get("text", "")
@@ -223,11 +260,15 @@ def validate_turn(
         errs.append("text contains markdown, brackets or list markers; write plain speech.")
     if m := VERDICT.search(text):
         errs.append(f"text contains a trade call or verdict ('{m.group(0)}'); remove it.")
+    if m := _SPELLED.search(text):
+        errs.append(f"'{m.group(0)}' is spelled out; write numbers as digits the way SOURCES do.")
 
     claims = out.get("claims", [])
     if not CLAIMS[0] <= len(claims) <= CLAIMS[1]:
         errs.append(f"{len(claims)} claims; must be {CLAIMS[0]}-{CLAIMS[1]}.")
-    earlier = {norm(c.text) for line in history for c in line.claims}
+    earlier = [c.text for line in history for c in line.claims]
+    # Same side, same source, same number = the same fact said again in new words.
+    used = {(c.source_id, n) for line in history if line.speaker == speaker for c in line.claims for n in numbers(c.text)}
     cited: set[str] = set()
     for i, c in enumerate(claims, 1):
         source = fact_sheet.source(c.get("source_id"))
@@ -239,8 +280,10 @@ def validate_turn(
             errs.append(f'claim {i}: quote is not copied exactly from {source.id} ("{source.excerpt}").')
         if len(words(c.get("text", ""))) > CLAIM_MAX_WORDS:
             errs.append(f"claim {i}: longer than {CLAIM_MAX_WORDS} words.")
-        if norm(c.get("text", "")) in earlier:
-            errs.append(f"claim {i}: repeats an earlier claim.")
+        if any(same_fact(c.get("text", ""), e) for e in earlier) or {
+            (source.id, n) for n in numbers(c.get("text", ""))
+        } & used:
+            errs.append(f"claim {i}: repeats a fact already used in TRANSCRIPT; bring a new one.")
 
     allowed = numbers(_number_text(fact_sheet, cited)) | numbers(target.text if target else "") | numbers(question or "")
     if stray := numbers(text) - allowed:
@@ -349,10 +392,12 @@ def _facts(fact_sheet: FactSheet) -> dict:
         "COMPANY": f"{fact_sheet.company} ({fact_sheet.ticker}), figures as of {fact_sheet.as_of}",
         "SOURCES": [{"id": s.id, "kind": s.kind, "label": s.label, "excerpt": s.excerpt} for s in fact_sheet.sources],
         "METRICS": [
-            {"label": m.label, "value": m.value, "unit": m.unit, "formula": m.formula, "source_ids": m.source_ids}
+            {"label": m.label, "value": show_metric(m.value, m.unit), "formula": m.formula, "source_ids": m.source_ids}
             for m in fact_sheet.metrics
         ],
-        "DEBT": [d.model_dump() for d in fact_sheet.debt],
+        "DEBT": [
+            {**d.model_dump(exclude={"amount_usd"}), "amount": money(d.amount_usd)} for d in fact_sheet.debt
+        ],
     }
 
 
@@ -423,7 +468,7 @@ def generate_turn(
     out = _call(
         SYSTEM_PROMPTS[speaker], json.dumps(context, indent=1),
         _turn_schema([s.id for s in fact_sheet.sources]), 0.8,
-        lambda o: validate_turn(o, fact_sheet, history, target, question),
+        lambda o: validate_turn(o, fact_sheet, history, target, question, speaker),
     )
     return None if out is None else to_line(out["text"], out["claims"], speaker, turn)
 
