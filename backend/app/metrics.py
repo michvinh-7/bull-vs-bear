@@ -7,7 +7,7 @@ Done when every metric matches a hand calculation from the 10-K.
 [TODO: move this to README later]
 Definitions and formulas:
 
-Leverage:
+Debt-to-EBITDA (Indication of leverage):
 [Total debt]/[EBITDA]
 This shows the gains vs losses since it compares the debt/loans taken on by the business with the gains/cash flow. 
 
@@ -30,7 +30,7 @@ Two different loan types -
 (Debt) Maturity Wall: 
 This is when a large amount of a firm's debt is due within a short period of time (1-2 years), which increases the risk of it rolling over.
 
-Liquidity: 
+Total Immediate Liquidity: 
 Ease in which an asset or security can become cash. 
 Usually a ratio
 Here, we are using the undrawn revolver amount which is only used when a borrower can sign/affirm that there is no upcoming default.
@@ -49,7 +49,7 @@ def ebitda(ebit: float, depreciation_amortization: float) -> float:
 
 
 def leverage(total_debt: float, ebitda: float) -> float:
-    """Total debt / EBITDA, in turns (x)."""
+    """Debt-to-EBITDA ratio, an indicator of leverage: total debt / EBITDA, in turns (x)."""
     return round(total_debt / ebitda, 2)
 
 
@@ -76,7 +76,7 @@ def next_big_maturity(maturities: dict[int, float], threshold_pct: float = 10, t
 
 
 def liquidity(cash: float, undrawn_revolver: float) -> float:
-    """Cash plus undrawn revolver capacity."""
+    """Total immediate liquidity: cash plus undrawn revolver capacity."""
     return cash + undrawn_revolver
 
 

@@ -58,7 +58,7 @@ def check_claim(claim: Claim, fact_sheet: FactSheet) -> Claim:
     # premise = the filing excerpt, hypothesis = what the debater said. Excerpts say "we" and
     # "the company", so the premise names the company or the model can't tie a claim about
     # Verizon to them. Metrics computed from this source are added too: the model can't
-    # work out "13.6x leverage" from the debt and EBITDA figures on its own.
+    # work out a 13.6x debt-to-EBITDA ratio from the debt and EBITDA figures on its own.
     # Errors are raised, not hidden: main.py catches them and leaves labels "pending".
     computed = [
         f"{m.label} was {show_metric(m.value, m.unit)} ({m.formula})."

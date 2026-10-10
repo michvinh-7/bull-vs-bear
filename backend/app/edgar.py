@@ -315,7 +315,7 @@ def pull_fields(facts: dict, text: str | None = None) -> dict:
     """
     end = fiscal_year_end(facts)
     # a bank's interest expense is mostly paid on deposits and its "debt" funds its loans, so
-    # leverage and coverage would be meaningless; better to say so than show a wrong debate
+    # debt-to-EBITDA and coverage would be meaningless; better to say so than show a wrong debate
     if lookup(facts, "Deposits", "InterestExpenseDeposits", end=end)[0]:
         raise ValueError(f"{facts.get('entityName', 'this company')} is a bank; credit metrics here don't apply to banks")
     fields, tags, excerpts = {}, {}, {}

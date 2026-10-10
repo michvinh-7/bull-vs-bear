@@ -64,13 +64,12 @@ def test_debaters_can_quote_every_number_in_the_sheet():
         assert agents.numbers(n) <= agents.numbers(said), n
 
 
-def test_sentence_without_a_figure_is_skipped():
+def test_sentence_without_a_figure_is_still_a_source():
     no_figure = Excerpt("We had no borrowings outstanding under the two revolving credit facilities as of December 31, 2025.", "23")
     sheet = facts.fact_sheet_from("AMZN", FACTS, pulled(excerpts={"undrawn_revolver": no_figure}), URL)
-    assert not any("no borrowings" in s.excerpt for s in sheet.sources)
+    assert (sheet.sources[0].label, sheet.sources[0].excerpt) == ("10-K · p. 23", no_figure.text)
     liquidity = next(x for x in sheet.metrics if x.name == "liquidity_usd")
-    # the value still counts; the metric cites only what's left (the statements source)
-    assert liquidity.value == 31_048e6 and liquidity.source_ids == ["S2"]
+    assert liquidity.value == 31_048e6 and liquidity.source_ids == ["S1", "S3"]
 
 
 def test_metrics_with_missing_inputs_are_left_out():
@@ -101,7 +100,7 @@ def test_sample_company_needs_no_network(monkeypatch):
 
 def test_cached_sheet_skips_edgar(monkeypatch):
     sheet = facts.fact_sheet_from("VZ", FACTS, pulled(), URL)
-    monkeypatch.setattr(store, "_fact_sheets", {"VZ": sheet})
+    monkeypatch.setattr(store, "_fact_sheets", {f"VZ@v{facts.SHEET_VERSION}": sheet, "AMC": "an old sheet"})
     monkeypatch.setattr(store, "_client", None)
     monkeypatch.setattr(edgar, "get_cik", lambda t: pytest.fail("called EDGAR"))
     assert facts.build_fact_sheet("vz") is sheet

@@ -78,8 +78,8 @@ def test_premise_names_the_company_and_its_metrics(monkeypatch):
     seen = []
     monkeypatch.setattr(verify, "nli", lambda premise, hypothesis: seen.append(premise) or "neutral")
     sheet = SHEET.model_copy(update={"metrics": [
-        Metric(name="leverage", label="Leverage", value=13.6, unit="x", formula="$4 billion debt / $296 million EBITDA", source_ids=["S1"]),
+        Metric(name="leverage", label="Debt-to-EBITDA", value=13.6, unit="x", formula="$4 billion debt / $296 million EBITDA", source_ids=["S1"]),
     ]})
-    verify.check_claim(Claim(id="a", text="Leverage is 13.6x.", source_id="S1"), sheet)
+    verify.check_claim(Claim(id="a", text="Debt-to-EBITDA is 13.6x.", source_id="S1"), sheet)
     assert seen == ["From Acme's filing: Revenue grew 12% to $4.1B in FY2025. "
-                    "Leverage was 13.6x ($4 billion debt / $296 million EBITDA)."]
+                    "Debt-to-EBITDA was 13.6x ($4 billion debt / $296 million EBITDA)."]

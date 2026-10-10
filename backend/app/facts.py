@@ -5,22 +5,23 @@ Both debaters argue only from this.
 """
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
 import httpx
 
-from . import companies, edgar, metrics, store
+from . import companies, config, edgar, metrics, research, store
 from .agents import money
-from .schemas import FactSheet, Metric, Source
+from .schemas import DebtInstrument, FactSheet, Metric, Source
 
 EXAMPLE = Path(__file__).resolve().parent / "examples" / "fact_sheet.json"  # copy of shared/examples
 # the made-up sample company; it isn't on EDGAR, so it always gets the example sheet
 SAMPLE_TICKER = "NWRC"
+# bump when the sheet's contents change, so sheets cached by older code are rebuilt
+SHEET_VERSION = 6
 
 
-# a dollar amount, a percentage or a "1.6 billion"; dates and years don't count
-_FIGURE = re.compile(r"\$\s?\d|\d\s?%|\d\s*(?:million|billion|percent)", re.I)
 
 
 class DataUnavailable(RuntimeError):
@@ -28,16 +29,14 @@ class DataUnavailable(RuntimeError):
 
 
 def build_fact_sheet(ticker: str) -> FactSheet:
-    """The latest 10-K's numbers, the metrics computed from them, and the sources they cite.
-
-    TODO(Person 1): Gemini (with Search grounding) for recent news + debt_details,
-    added as N1, N2... sources and `debt` rows.
-    """
+    """The latest 10-K's numbers, the metrics computed from them, the debt instruments and
+    recent news (both found by Gemini, checked by code), and the sources they all cite."""
     ticker = ticker.upper()
     if ticker == SAMPLE_TICKER:
         return FactSheet.model_validate(json.loads(EXAMPLE.read_text(encoding="utf-8")))
     # demo companies are built once, then served from the cache
-    if cached := store.load_fact_sheet(ticker):
+    key = f"{ticker}@v{SHEET_VERSION}"
+    if cached := store.load_fact_sheet(key):
         return cached
 
     try:
@@ -53,8 +52,44 @@ def build_fact_sheet(ticker: str) -> FactSheet:
         ) from e
 
     sheet = fact_sheet_from(ticker, facts, edgar.pull_fields(facts, text), url)
-    store.save_fact_sheet(sheet)
+    if config.GEMINI_API_KEY:
+        fiscal_year = date.fromisoformat(edgar.fiscal_year_end(facts)).year
+        with ThreadPoolExecutor(2) as pool:
+            debt = pool.submit(research.debt_instruments, text, sheet.company, fiscal_year)
+            news = pool.submit(research.news_items, sheet.company, ticker)
+            sheet = add_research(sheet, _or_nothing(debt, "debt instruments"), _or_nothing(news, "news"), url)
+    store.save_fact_sheet(sheet, key)
     return sheet
+
+
+def _or_nothing(job, what: str) -> list:
+    """Gemini's part is extra: if it fails, the sheet is still built from the 10-K alone."""
+    try:
+        return job.result()
+    except Exception as e:
+        print(f"[facts] skipped {what}: {e!r}"[:300])
+        return []
+
+
+def add_research(sheet: FactSheet, debt: list[tuple[dict, str, str | None]], news: list[dict], url: str) -> FactSheet:
+    """Adds research.debt_instruments rows (citing their 10-K quote) and research.news_items
+    (as N1, N2... sources) to a fact sheet."""
+    sources = list(sheet.sources)
+
+    def source_for(excerpt: str, label: str) -> str:
+        for s in sources:
+            if s.excerpt == excerpt:
+                return s.id
+        sources.append(Source(id=f"S{sum(s.id.startswith('S') for s in sources) + 1}", kind="10-K", label=label, url=url, excerpt=excerpt))
+        return sources[-1].id
+
+    rows = [
+        DebtInstrument(**fields, source_id=source_for(quote, f"10-K · p. {page}" if page else "10-K"))
+        for fields, quote, page in debt
+    ]
+    for i, item in enumerate(news):
+        sources.append(Source(id=f"N{i + 1}", kind="news", label=item["label"], url=item["url"], excerpt=item["excerpt"]))
+    return sheet.model_copy(update={"sources": sources, "debt": rows})
 
 
 def fact_sheet_from(ticker: str, facts: dict, pulled: dict, url: str) -> FactSheet:
@@ -71,24 +106,14 @@ def fact_sheet_from(ticker: str, facts: dict, pulled: dict, url: str) -> FactShe
         sources.append(Source(id=f"S{len(sources) + 1}", kind="10-K", label=label, url=url, excerpt=excerpt))
         return sources[-1].id
 
-    # numbers read from the 10-K text cite their own sentence and page. A sentence with no
-    # figure in it ("We had no borrowings outstanding under ... as of December 31, 2025")
-    # gives debaters nothing to quote, so it's skipped; the metric still shows the value.
-    from_text = {}
-    for name, ex in excerpts.items():
-        if _FIGURE.search(ex.text):
-            from_text[name] = add(f"10-K · p. {ex.page}" if ex.page else "10-K", ex.text)
+    # numbers read from the 10-K text cite their own sentence and page, even one with no
+    # figure in it ("We had no borrowings outstanding under ..."): it's still the evidence
+    from_text = {name: add(f"10-K · p. {ex.page}" if ex.page else "10-K", ex.text) for name, ex in excerpts.items()}
     # XBRL numbers have no sentence of their own, so one source states them plainly
     statements = add("10-K · Financial statements", _statement_excerpt(f, excerpts, end))
 
     def cite(*names: str) -> list[str]:
-        ids = set()
-        for n in names:
-            if n in from_text:
-                ids.add(from_text[n])
-            elif n not in excerpts:  # from XBRL (a skipped text sentence cites nothing)
-                ids.add(statements)
-        return sorted(ids)
+        return sorted({from_text.get(n, statements) for n in names})
 
     return FactSheet(
         company=_company_name(ticker, facts),
@@ -110,7 +135,7 @@ def _metrics(f: dict, cite) -> list[Metric]:
 
     if debt and ebitda and ebitda > 0:
         out.append(Metric(
-            name="leverage", label="Leverage", unit="x",
+            name="leverage", label="Debt-to-EBITDA", unit="x",
             value=metrics.leverage(debt, ebitda),
             formula=f"{money(debt)} debt / {money(ebitda)} EBITDA",
             source_ids=cite("total_debt", *ebitda_sources),
@@ -142,7 +167,7 @@ def _metrics(f: dict, cite) -> list[Metric]:
     if f["cash"] is not None:
         revolver = f["undrawn_revolver"]
         out.append(Metric(
-            name="liquidity_usd", label="Liquidity", unit="usd",
+            name="liquidity_usd", label="Total immediate liquidity", unit="usd",
             value=metrics.liquidity(f["cash"], revolver or 0),
             formula=f"{money(f['cash'])} cash + {money(revolver)} undrawn revolver" if revolver
             else f"{money(f['cash'])} cash, no undrawn revolver reported",

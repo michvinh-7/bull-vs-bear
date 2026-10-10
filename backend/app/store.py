@@ -49,11 +49,13 @@ def load_debate(debate_id: str) -> Debate | None:
     return None
 
 
-def save_fact_sheet(sheet: FactSheet) -> None:
-    _fact_sheets[sheet.ticker] = sheet
+def save_fact_sheet(sheet: FactSheet, key: str | None = None) -> None:
+    """`key` defaults to the ticker; facts.py adds a version so old sheets aren't reused."""
+    key = key or sheet.ticker
+    _fact_sheets[key] = sheet
     if _client:
         _safe("save fact sheet", lambda: _client.table("fact_sheets").upsert(
-            {"ticker": sheet.ticker, "data": sheet.model_dump()}
+            {"ticker": key, "data": sheet.model_dump()}
         ).execute())
 
 
