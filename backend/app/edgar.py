@@ -9,11 +9,22 @@ Useful endpoints
   Filing list:        https://data.sec.gov/submissions/CIK##########.json
 """
 import httpx
+import re
+from datetime import date
 
 from . import config
 
 HEADERS = {"User-Agent": config.SEC_USER_AGENT}
 
+
+_MATURITY_TAGS = [
+    "LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths",
+    "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo",
+    "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree",
+    "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFour",
+    "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFive",
+    "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive"
+]
 
 def get_cik(ticker: str) -> str:
     """Return the 10-digit zero-padded CIK for a ticker."""
@@ -43,8 +54,91 @@ def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
             accessionNum = recent["accessionNumber"][i].replace("-", "")
             docName = recent["primaryDocument"][i]
             # url is from https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
-            r = httpx.get(f"https://www.sec.gov/Archives/edgar/data/(cik)/{accessionNum}/{docName}", headers=HEADERS, timeout=30)
+            r = httpx.get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accessionNum}/{docName}", headers=HEADERS, timeout=30)
             r.raise_for_status()
             return r.text
     # this is a number given to every SEC file, won't necessarily be a 10-k
     raise ValueError(f"{form} not found for CIK: {cik}")
+
+""" 
+We need to pull several metrics for the metrics.py file calculations-
+this would be coming from the above 10-k, which is in XBRL tagging format
+
+There is some overlap with the information coming in from the company facts, so some metrics will be from there depending 
+on ease of access
+
+[NOTE] admittedly, there is an issue since this was not standardized until 2019
+for the purposes of this hackathon it will be unlikely that we address filings before that year
+
+We will need to use the following tags:
+
+NetIncomeLoss
+ProfitLoss
+IncomeTaxExpenseBenefit
+InterestExpense/InterestExpenseDebt/InterestExpenseNonoperating
+DepreciationDepletionAndAmortization/DepreciationAndAmortization
+OperatingIncomeLoss
+CashAndCashEquivalentsAtCarryingValue
+LongTermDebtCurrent/LongTermDebtNoncurrent/LongTermDebt
+ShortTermBorrowings
+CommercialPaper
+FinanceLeaseLiabilityCurrent/FinanceLeaseLiabilityNoncurrent
+LongTermDebtMaturitiesRepaymentsOfPrincipalInNext[VARIABLE] (twelve months, year one, year two, etc...)
+
+"""
+
+# using the given tag, get the entry
+def get_entry(facts: dict, tag: str) -> list[dict]:
+    try:
+        return facts["facts"]["us-gaap"][tag]["units"]["USD"]
+    except KeyError:
+        return []
+
+def is_annual(e: dict) -> bool:
+    if "start" not in e:
+        return True
+    days = (date.fromisoformat(e["end"])-date.fromisoformat(e["start"])).days
+    # fiscal years vary in length - apple, for example, ends on the last sunday of sept
+    return 360 <= days <= 372
+
+
+def lookup(facts: dict, *tags: str, period:str):
+    for t in tags:
+        matches = []
+        for e in get_entry(facts, t):
+            if e["end"] == e.get("form") in ("10-K",) and is_annual(e):
+                matches.append(e)
+        if matches:
+            return max(matches, key=lambda e: e["filed"]["value"])
+    return None, None
+        
+
+
+"""
+Total debt:
+LongTermDebtCurrent/LongTermDebtNoncurrent/LongTermDebt + ShortTermBorrowings + CommercialPaper
+
+[NOTE]: unsure on adding the following fields for now- will be doing research 
+UnsecuredDebtMember/DebenturesMember
+SubordinatedDebtMember/SubordinatedLongTermDebt
+FinanceLeaseLiability/CapitalLeaseObligationsNoncurrent
+
+"""
+def total_debt(facts: dict, end: str):
+    debts = {}
+    val, tag = lookup(facts, "LongTermDebt", end=end)
+    if val is not None:
+        debts[tag] = val
+    for t in ("ShortTermBorrowings", "CommercialPaper"):
+        v, tg = lookup(facts, t, end=end)
+        if v is not None:
+            debts[tg] = v
+    return (sum(debts.values()) if debts else None), list(debts)
+
+
+
+
+
+
+# bc the xbrl file is a pain to parse through, everything above came from the company facts
+
