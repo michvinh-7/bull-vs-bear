@@ -25,8 +25,12 @@ def client(monkeypatch):
     return TestClient(app)
 
 
-def test_health(client):
-    assert client.get("/health").json() == {"ok": True}
+def test_health(client, monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "secret-value")
+    body = client.get("/health").json()
+    assert body["ok"] is True and body["gemini"]["key"] == "set" and body["storage"] == "memory"
+    assert "secret-value" not in str(body)
 
 
 def test_demo_companies(client):

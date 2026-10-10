@@ -36,7 +36,13 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    # Which services are configured, never the keys themselves.
+    return {
+        "ok": True,
+        "gemini": {"model": config.GEMINI_MODEL, "key": "set" if config.GEMINI_API_KEY else "missing"},
+        "voice": config.VOICE_ENABLED,
+        "storage": "supabase" if store._client else "memory",
+    }
 
 
 @app.get("/companies", response_model=list[Company], response_model_exclude_none=True)
@@ -142,9 +148,21 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             await ws.send_json({"type": "line", "data": line.model_dump()})
             return True
 
+        api_failures = 0
+
         async def analyst(side: str, question: str | None = None, target="auto") -> bool:
+            nonlocal api_failures
             turn = await start(side)
-            return await emit(await asyncio.to_thread(agents.generate_turn, sheet, debate.lines, side, turn, question, target))
+            line = await asyncio.to_thread(agents.generate_turn, sheet, debate.lines, side, turn, question, target)
+            # Gemini itself failing (not a rule break) twice in a row: stop and say why, instead of
+            # quietly finishing with no lines.
+            api_failures = api_failures + 1 if line is None and agents.last_error else 0
+            if api_failures >= 2:
+                raise RuntimeError(
+                    f"The debate engine is unavailable right now ({agents.last_error}). "
+                    "Try again in a minute, or replay a saved debate."
+                )
+            return await emit(line)
 
         next_side, spoken, cross_examined = "bull", 0, False
         redos = 2  # a dropped turn gets a fresh try, so one side doesn't speak twice in a row
