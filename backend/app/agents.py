@@ -306,7 +306,8 @@ def _generate(system: str, user: str, schema: type[BaseModel], temperature: floa
     from google.genai import types
 
     if _client is None:
-        _client = genai.Client(api_key=config.GEMINI_API_KEY)
+        # A stuck call fails after 20 s instead of freezing the debate.
+        _client = genai.Client(api_key=config.GEMINI_API_KEY, http_options=types.HttpOptions(timeout=20_000))
     resp = _client.models.generate_content(
         model=config.GEMINI_MODEL,
         contents=user,
@@ -315,7 +316,7 @@ def _generate(system: str, user: str, schema: type[BaseModel], temperature: floa
             temperature=temperature,
             response_mime_type="application/json",
             response_schema=schema,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),  # speed: ~1.5 s budget between turns
+            thinking_config=types.ThinkingConfig(thinking_level="minimal"),  # speed: ~1.5 s budget between turns
         ),
     )
     return json.loads(resp.text)
