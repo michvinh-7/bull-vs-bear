@@ -188,10 +188,13 @@ async def debate_socket(ws: WebSocket, debate_id: str):
                     continue
                 planned -= 1  # moderator dropped: no extra line after all
 
-            if not await analyst(next_side) and redos:
-                redos -= 1
-                continue
-            next_side, spoken = _other(next_side), spoken + 1
+            if await analyst(next_side):
+                next_side, spoken = _other(next_side), spoken + 1
+            elif redos:
+                redos -= 1  # dropped: same side tries again without using up the debate
+            else:
+                spoken += 1  # out of redos: use up the slot, but the same side still speaks next
+                # so nobody speaks twice in a row
 
         debate.brief = await asyncio.to_thread(agents.write_brief, debate.fact_sheet, debate.lines)
         debate.status = "done"

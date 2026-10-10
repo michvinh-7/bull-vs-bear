@@ -89,8 +89,9 @@ HARD RULES. Code checks your output; breaking any rule rejects the turn.
    to them plainly; they may not know finance terms.
 6. NO TRADE CALLS. Never say buy, sell, short, go long, recommend, or anything
    telling the listener what to do with money. You argue; the human decides.
-7. NO REPEATS. Never repeat a fact you already used in TRANSCRIPT, even in new
-   words. Bring a new fact or a new angle every turn.
+7. NO REPEATS. Never repeat a fact from YOUR_RECENT_CLAIMS (your last 2 turns),
+   even in new words. Bring a new fact or a new angle. Older facts may come
+   back if they answer the point in front of you.
 """
 
 SYSTEM_PROMPTS = {
@@ -266,9 +267,11 @@ def validate_turn(
     claims = out.get("claims", [])
     if not CLAIMS[0] <= len(claims) <= CLAIMS[1]:
         errs.append(f"{len(claims)} claims; must be {CLAIMS[0]}-{CLAIMS[1]}.")
-    earlier = [c.text for line in history for c in line.claims]
-    # Same side, same source, same number = the same fact said again in new words.
-    used = {(c.source_id, n) for line in history if line.speaker == speaker for c in line.claims for n in numbers(c.text)}
+    # Only the side's own last 2 turns count: fact sheets are small, so key facts must be able to come back.
+    recent = _recent_claims(history, speaker)
+    earlier = [c.text for c in recent]
+    # Same source, same number = the same fact said again in new words.
+    used = {(c.source_id, n) for c in recent for n in numbers(c.text)}
     cited: set[str] = set()
     for i, c in enumerate(claims, 1):
         source = fact_sheet.source(c.get("source_id"))
@@ -283,17 +286,22 @@ def validate_turn(
         if any(same_fact(c.get("text", ""), e) for e in earlier) or {
             (source.id, n) for n in numbers(c.get("text", ""))
         } & used:
-            errs.append(f"claim {i}: repeats a fact already used in TRANSCRIPT; bring a new one.")
+            errs.append(f"claim {i}: repeats a fact from YOUR_RECENT_CLAIMS; bring a new one.")
 
     allowed = numbers(_number_text(fact_sheet, cited)) | numbers(target.text if target else "") | numbers(question or "")
     if stray := numbers(text) - allowed:
         errs.append(f"numbers {sorted(stray)} are not in any source you cited; cite the source or drop the number.")
 
     if target is not None:
-        first = sents[0] if sents else ""
-        if not (numbers(first) & numbers(target.text) or content_words(first) & content_words(target.text)):
+        opening = " ".join(sents[:2])  # allow a short lead-in before the rebuttal
+        if not (numbers(opening) & numbers(target.text) or content_words(opening) & content_words(target.text)):
             errs.append("first sentence does not engage TARGET_CLAIM; reuse its key number or term and answer it.")
     return errs
+
+
+def _recent_claims(history: list[LineMessage], speaker: str, turns: int = 2) -> list[Claim]:
+    own = [line for line in history if line.speaker == speaker][-turns:]
+    return [c for line in own for c in line.claims]
 
 
 def validate_question(out: dict, fact_sheet: FactSheet, history: list[LineMessage]) -> list[str]:
@@ -468,6 +476,7 @@ def generate_turn(
         "TRANSCRIPT": _transcript(history),
         "TARGET_CLAIM": {"id": target.id, "text": target.text, "yours": target.id in mine} if target else None,
         "QUESTION": question,
+        "YOUR_RECENT_CLAIMS": [c.text for c in _recent_claims(history, speaker)],
     }
     out = _call(
         SYSTEM_PROMPTS[speaker], json.dumps(context, indent=1),

@@ -128,6 +128,17 @@ def test_same_side_cannot_repeat_a_fact_in_new_words(gemini):
     assert "repeats a fact" in prompts[1]
 
 
+def test_facts_older_than_two_own_turns_may_come_back(gemini):
+    replies, _ = gemini
+    history = [line("bull", 1, [("Northwind had $110 million of cash.", "S4", "verified")]),
+               line("bull", 3, [("The term loan matures in 2028.", "S2", "verified")]),
+               line("bull", 5, [("Store closures cut costs.", "N1", "verified")])]
+    replies.append({"text": "They hold $110 million of cash. That is real cushion.",
+                    "claims": [{"text": "Northwind held $110 million of cash.", "source_id": "S4",
+                                "quote": "we had $110 million of cash"}]})
+    assert agents.generate_turn(SHEET, history, "bull", 7, target=None) is not None
+
+
 def test_rebuttal_must_engage_the_target(gemini):
     replies, prompts = gemini
     history = [line("bull", 1, [("The term loan is secured by owned real property.", "S1", "pending")])]
@@ -260,6 +271,14 @@ def test_dropped_turn_gets_a_fresh_try_from_the_same_side(client, monkeypatch):
     assert calls[:3] == ["bull", "bear", "bear"]
     analysts = [s for s, _ in speakers(msgs) if s != "moderator"]
     assert analysts.count("bull") == analysts.count("bear") == 2
+
+
+def test_never_the_same_side_twice_even_when_turns_keep_failing(client, monkeypatch):
+    real = agents.generate_turn
+    monkeypatch.setattr(agents, "generate_turn", lambda sheet, history, side, *a: None if side == "bear" and len(history) in (1, 3) else real(sheet, history, side, *a))
+    store.save_debate(Debate(id="d6", ticker="NWRC", max_turns=6))
+    names = [s for s, _ in speakers(run(client, "d6"))]
+    assert all(a != b for a, b in zip(names, names[1:]) if "moderator" not in (a, b)), names
 
 
 def test_gemini_outage_ends_with_a_clear_error(client, monkeypatch):
