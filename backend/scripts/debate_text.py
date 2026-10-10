@@ -16,6 +16,7 @@ from app import config, main, store
 from app.schemas import Debate
 
 config.VOICE_ENABLED = False
+config.PACING = False  # text only: no one is listening, so no need to wait for playback
 store._client = None  # in-memory only
 
 ticker = sys.argv[1] if len(sys.argv) > 1 else "NWRC"

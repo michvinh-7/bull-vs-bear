@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import agents, companies, config, store, verify, voice
 from .companies import Company
 from .facts import build_fact_sheet
+from .pacing import Pacer
 from .schemas import (
     CommitteeBrief,
     Debate,
@@ -95,6 +96,11 @@ async def debate_socket(ws: WebSocket, debate_id: str):
          {"type": "error",      "message": str}
        Client -> server messages:
          {"type": "interrupt", "question": str}
+         {"type": "played", "turn": int}      (optional: line `turn` finished playing)
+
+    Pacing: the server stays one line ahead of playback (see pacing.py), so a
+    question is answered right after the line that's playing, and questions
+    are taken until the last line has been heard. Then the brief is sent.
 
     Order of lines: bull and bear alternate for max_turns lines. Halfway, the
     moderator cross-examines one side; that side answers and the other
@@ -115,7 +121,13 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         return
 
     interrupts: asyncio.Queue[str] = asyncio.Queue()
-    listener = asyncio.create_task(_listen_for_interrupts(ws, interrupts))
+    pacer = Pacer()
+    listener = asyncio.create_task(_listen(ws, interrupts, pacer))
+
+    async def pace(wake: asyncio.Queue | None = None, at_most: int = 1):
+        """Hold until the listener is at most `at_most` lines behind (or a question arrives on `wake`)."""
+        if config.PACING:
+            await pacer.wait(at_most, wake)
 
     try:
         debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
@@ -146,6 +158,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             debate.lines.append(line)
             store.save_debate(debate)
             await ws.send_json({"type": "line", "data": line.model_dump()})
+            pacer.sent(line.turn, line.text)
             return True
 
         api_failures = 0
@@ -164,17 +177,28 @@ async def debate_socket(ws: WebSocket, debate_id: str):
                 )
             return await emit(line)
 
+        async def answer(side: str, question: str, target="auto") -> bool:
+            """A reply to a question gets one fresh try if dropped; a question shouldn't go half-answered."""
+            return await analyst(side, question, target) or await analyst(side, question, target)
+
+        async def answer_question(question: str):
+            nonlocal interrupts_used, planned
+            if interrupts_used >= config.MAX_INTERRUPTS:
+                return
+            interrupts_used += 1
+            planned += 3
+            await emit(agents.relay_question(question, await start("moderator")))  # shown at once
+            await pace()
+            await answer(next_side, question, target=None)  # answers the user, nothing to rebut
+            await pace()
+            await answer(_other(next_side), question)  # answers too, and engages the first answer
+
         next_side, spoken, cross_examined = "bull", 0, False
         redos = 2  # a dropped turn gets a fresh try, so one side doesn't speak twice in a row
         while spoken < debate.max_turns:
+            await pace(wake=interrupts)  # write the next line while the current one plays
             if not interrupts.empty():
-                question = interrupts.get_nowait()
-                if interrupts_used < config.MAX_INTERRUPTS:
-                    interrupts_used += 1
-                    planned += 3
-                    await emit(agents.relay_question(question, await start("moderator")))
-                    await analyst(next_side, question, target=None)  # answers the user, nothing to rebut
-                    await analyst(_other(next_side), question)  # answers too, and engages the first answer
+                await answer_question(interrupts.get_nowait())
                 continue
 
             if spoken == debate.max_turns // 2 and not cross_examined:
@@ -183,11 +207,14 @@ async def debate_socket(ws: WebSocket, debate_id: str):
                 if asked:
                     line, side, about = asked
                     await emit(line)
-                    await analyst(side, line.text, about)  # defends or rebuts the claim the question is about
+                    await pace()
+                    await answer(side, line.text, about)  # defends or rebuts the claim the question is about
                     next_side, spoken = _other(side), spoken + 1
                     continue
                 planned -= 1  # moderator dropped: no extra line after all
 
+            if _last_analyst(debate) == next_side:  # a dropped answer above: still never twice in a row
+                next_side = _other(next_side)
             if await analyst(next_side):
                 next_side, spoken = _other(next_side), spoken + 1
             elif redos:
@@ -195,6 +222,13 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             else:
                 spoken += 1  # out of redos: use up the slot, but the same side still speaks next
                 # so nobody speaks twice in a row
+
+        # Keep taking questions until the last line has been heard.
+        while config.PACING:
+            await pace(wake=interrupts, at_most=0)
+            if interrupts.empty() or interrupts_used >= config.MAX_INTERRUPTS:
+                break
+            await answer_question(interrupts.get_nowait())
 
         debate.brief = await asyncio.to_thread(agents.write_brief, debate.fact_sheet, debate.lines)
         debate.status = "done"
@@ -214,13 +248,19 @@ def _other(side: str) -> str:
     return "bear" if side == "bull" else "bull"
 
 
-async def _listen_for_interrupts(ws: WebSocket, queue: asyncio.Queue):
+def _last_analyst(debate: Debate) -> str | None:
+    return next((line.speaker for line in reversed(debate.lines) if line.speaker != "moderator"), None)
+
+
+async def _listen(ws: WebSocket, interrupts: asyncio.Queue, pacer: Pacer):
     try:
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "interrupt" and msg.get("question"):
-                await queue.put(msg["question"])
-    except (WebSocketDisconnect, RuntimeError):
+                await interrupts.put(msg["question"])
+            elif msg.get("type") == "played" and isinstance(msg.get("turn"), int):
+                pacer.played(msg["turn"])
+    except (WebSocketDisconnect, RuntimeError, ValueError):
         pass
 
 

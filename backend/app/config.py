@@ -28,5 +28,8 @@ VOICE_ENABLED = os.getenv("VOICE_ENABLED", "false").lower() == "true"
 
 MAX_TURNS = int(os.getenv("MAX_TURNS", "8"))  # bull + bear lines, not counting moderator or interrupts
 
+# Keep the debate one line ahead of playback (off = generate as fast as possible, for tests/scripts).
+PACING = os.getenv("PACING", "true").lower() == "true"
+
 # Each user interrupt adds 3 lines (question + both sides); capped to protect voice credits.
 MAX_INTERRUPTS = int(os.getenv("MAX_INTERRUPTS", "3"))

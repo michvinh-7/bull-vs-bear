@@ -3,7 +3,7 @@ SEC list, so tests never touch the network or the real Supabase."""
 import pytest
 from fastapi.testclient import TestClient
 
-from app import companies, store
+from app import companies, config, store
 from app.companies import Company
 from app.main import app
 from app.schemas import CommitteeBrief, Debate
@@ -22,6 +22,7 @@ def client(monkeypatch):
     monkeypatch.setattr(store, "_client", None)
     monkeypatch.setattr(store, "_debates", {})
     monkeypatch.setattr(companies, "_sec", FAKE_SEC)
+    monkeypatch.setattr(config, "PACING", False)
     return TestClient(app)
 
 

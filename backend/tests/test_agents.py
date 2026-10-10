@@ -215,6 +215,7 @@ def test_positions_need_three_cited_points(gemini):
 
 @pytest.fixture
 def client(monkeypatch):
+    monkeypatch.setattr(config, "PACING", False)  # pacing has its own tests
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")
     monkeypatch.setattr(config, "VOICE_ENABLED", False)
     monkeypatch.setattr(store, "_client", None)
@@ -278,6 +279,18 @@ def test_never_the_same_side_twice_even_when_turns_keep_failing(client, monkeypa
     monkeypatch.setattr(agents, "generate_turn", lambda sheet, history, side, *a: None if side == "bear" and len(history) in (1, 3) else real(sheet, history, side, *a))
     store.save_debate(Debate(id="d6", ticker="NWRC", max_turns=6))
     names = [s for s, _ in speakers(run(client, "d6"))]
+    assert all(a != b for a, b in zip(names, names[1:]) if "moderator" not in (a, b)), names
+
+
+def test_dropped_answer_to_a_user_question_never_doubles_a_side(client, monkeypatch):
+    real = agents.generate_turn
+    monkeypatch.setattr(agents, "generate_turn", lambda sheet, history, side, turn, question=None, target="auto":
+                        None if side == "bear" and question == "Q?" else real(sheet, history, side, turn, question, target))
+    slow = main.build_fact_sheet
+    monkeypatch.setattr(main, "build_fact_sheet", lambda t: (time.sleep(0.3), slow(t))[1])
+    store.save_debate(Debate(id="d7", ticker="NWRC", max_turns=4))
+    names = [s for s, _ in speakers(run(client, "d7", interrupt="Q?"))]
+    assert names[:2] == ["moderator", "bull"]  # bull was due and answered; bear's answer failed twice
     assert all(a != b for a, b in zip(names, names[1:]) if "moderator" not in (a, b)), names
 
 
