@@ -12,9 +12,12 @@ import httpx
 import re
 from datetime import date
 
-from . import config
+from . import config, filing
 
 HEADERS = {"User-Agent": config.SEC_USER_AGENT}
+
+# 10-K/A is an amended 10-K
+ANNUAL_FORMS = ("10-K", "10-K/A")
 
 
 _MATURITY_TAGS = [
@@ -23,8 +26,10 @@ _MATURITY_TAGS = [
     "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree",
     "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFour",
     "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFive",
-    "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive"
 ]
+# everything due after year five, lumped together - could be spread over decades,
+# so it's kept out of the year-by-year maturities
+_AFTER_YEAR_FIVE_TAG = "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive"
 
 def get_cik(ticker: str) -> str:
     """Return the 10-digit zero-padded CIK for a ticker."""
@@ -43,7 +48,7 @@ def get_company_facts(cik: str) -> dict:
     return r.json()
 
 """ [TODO] as a stretch goal, probably a good idea to look into 10-k vs 10-k/a, that would be the ammended version"""
-def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
+def latest_filing_url(cik: str, form: str = "10-K") -> str:
     r = httpx.get(f"https://data.sec.gov/submissions/CIK{cik}.json", headers=HEADERS, timeout=30)
     r.raise_for_status()
     data = r.json()
@@ -54,11 +59,15 @@ def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
             accessionNum = recent["accessionNumber"][i].replace("-", "")
             docName = recent["primaryDocument"][i]
             # url is from https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
-            r = httpx.get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accessionNum}/{docName}", headers=HEADERS, timeout=30)
-            r.raise_for_status()
-            return r.text
-    # this is a number given to every SEC file, won't necessarily be a 10-k
+            return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accessionNum}/{docName}"
     raise ValueError(f"{form} not found for CIK: {cik}")
+
+
+def get_latest_filing_text(cik: str, form: str = "10-K") -> str:
+    """Plain text of the latest filing, with "[page N]" markers so claims can cite "p. 84"."""
+    r = httpx.get(latest_filing_url(cik, form), headers=HEADERS, timeout=60)
+    r.raise_for_status()
+    return filing.html_to_text(r.text)
 
 """ 
 We need to pull several metrics for the metrics.py file calculations-
@@ -101,22 +110,45 @@ def is_annual(e: dict) -> bool:
     # fiscal years vary in length - apple, for example, ends on the last sunday of sept
     return 360 <= days <= 372
 
+# each report of their income loss is done per fiscal year, so we can get the dates easily from here
+def fiscal_year_end(facts: dict) -> str:
+    """End date (YYYY-MM-DD) of the latest fiscal year reported in a 10-K."""
+    dates = []
+    for tag in ("NetIncomeLoss", "ProfitLoss"):
+        for e in get_entry(facts, tag):
+            if e.get("form") in ANNUAL_FORMS and e.get("fp") == "FY" and is_annual(e):
+                dates.append(e["end"])
+    if not dates:
+        raise ValueError("no annual net income found in company facts")
+    return max(dates)
 
-def lookup(facts: dict, *tags: str, period:str):
+
+
+def lookup(facts: dict, *tags: str, end: str) -> tuple[float | None, str | None]:
+    """Value for the fiscal year ending `end`, trying each tag in order.
+
+    Returns (value, tag used) so the fact sheet can say where the number came from,
+    or (None, None) if none of the tags were reported for that year.
+    """
     for t in tags:
         matches = []
         for e in get_entry(facts, t):
-            if e["end"] == e.get("form") in ("10-K",) and is_annual(e):
+            if e["end"] == end and e.get("form") in ANNUAL_FORMS and is_annual(e):
                 matches.append(e)
         if matches:
-            return max(matches, key=lambda e: e["filed"]["value"])
+            # the same number shows up again in later 10-Ks as a comparison year; take the newest filing
+            latest = max(matches, key=lambda e: e["filed"])
+            return latest["val"], t
     return None, None
-        
 
 
 """
 Total debt:
-LongTermDebtCurrent/LongTermDebtNoncurrent/LongTermDebt + ShortTermBorrowings + CommercialPaper
+LongTermDebt (already includes the current portion), or current + noncurrent when a company only
+reports the split, + ShortTermBorrowings + CommercialPaper
+  current:    DebtCurrent (already includes short-term borrowings and commercial paper, so those
+              aren't added again - verizon would double count otherwise), else LongTermDebtCurrent
+  noncurrent: LongTermDebtNoncurrent/LongTermDebtAndCapitalLeaseObligations (macy's uses this one; it includes finance leases)
 
 [NOTE]: unsure on adding the following fields for now- will be doing research 
 UnsecuredDebtMember/DebenturesMember
@@ -124,21 +156,139 @@ SubordinatedDebtMember/SubordinatedLongTermDebt
 FinanceLeaseLiability/CapitalLeaseObligationsNoncurrent
 
 """
-def total_debt(facts: dict, end: str):
+def total_debt(facts: dict, end: str) -> tuple[float | None, list[str]]:
     debts = {}
     val, tag = lookup(facts, "LongTermDebt", end=end)
     if val is not None:
         debts[tag] = val
-    for t in ("ShortTermBorrowings", "CommercialPaper"):
-        v, tg = lookup(facts, t, end=end)
-        if v is not None:
-            debts[tg] = v
+    else:
+        for tags in (("DebtCurrent", "LongTermDebtCurrent"), ("LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations")):
+            v, tg = lookup(facts, *tags, end=end)
+            if v is not None:
+                debts[tg] = v
+    if "DebtCurrent" not in debts:
+        for t in ("ShortTermBorrowings", "CommercialPaper"):
+            v, tg = lookup(facts, t, end=end)
+            if v is not None:
+                debts[tg] = v
     return (sum(debts.values()) if debts else None), list(debts)
 
 
+# income statement pieces for EBITDA and EBIT (flows over the fiscal year)
+def net_income(facts: dict, end: str):
+    return lookup(facts, "NetIncomeLoss", "ProfitLoss", end=end)
 
 
+def income_taxes(facts: dict, end: str):
+    return lookup(facts, "IncomeTaxExpenseBenefit", end=end)
+
+
+def interest_expense(facts: dict, end: str):
+    # InterestPaidNet is cash interest paid (from the cash flow statement), close enough when a
+    # company doesn't tag the expense itself, like kohl's. apple reports neither anymore.
+    return lookup(
+        facts, "InterestExpense", "InterestExpenseDebt", "InterestExpenseNonoperating", "InterestPaidNet", end=end
+    )
+
+
+def depreciation_amortization(facts: dict, end: str):
+    return lookup(
+        facts,
+        "DepreciationDepletionAndAmortization",
+        "DepreciationAndAmortization",
+        "DepreciationAmortizationAndAccretionNet",
+        end=end,
+    )
+
+
+def ebit(facts: dict, end: str):
+    # operating income is the usual stand-in for EBIT
+    return lookup(facts, "OperatingIncomeLoss", end=end)
+
+
+# balance sheet pieces (a snapshot on the fiscal year end date)
+def cash(facts: dict, end: str):
+    return lookup(facts, "CashAndCashEquivalentsAtCarryingValue", end=end)
+
+
+def undrawn_revolver(facts: dict, end: str) -> tuple[float | None, list[str]]:
+    """Revolver capacity still available to borrow."""
+    val, tag = lookup(facts, "LineOfCreditFacilityRemainingBorrowingCapacity", end=end)
+    if val is not None:
+        return val, [tag]
+    # most companies only tag the facility size, so subtract whatever is drawn (often nothing)
+    size, size_tag = lookup(facts, "LineOfCreditFacilityMaximumBorrowingCapacity", end=end)
+    if size is None:
+        return None, []
+    drawn, drawn_tag = lookup(facts, "LineOfCredit", end=end)
+    return size - (drawn or 0), [size_tag] + ([drawn_tag] if drawn_tag else [])
+
+
+def maturities(facts: dict, end: str) -> dict[int, float]:
+    """{year: principal due} from the 10-K's debt maturity table, for metrics.next_big_maturity.
+
+    _MATURITY_TAGS are in order (next 12 months, year two, ... year five), so the nth tag
+    is due in fiscal year + n. Pass total_debt to next_big_maturity so the threshold still
+    counts the debt due after year five.
+    """
+    year = date.fromisoformat(end).year
+    out = {}
+    for n, tag in enumerate(_MATURITY_TAGS, start=1):
+        v, _ = lookup(facts, tag, end=end)
+        if v is not None:
+            out[year + n] = v
+    return out
+
+
+def maturities_after_year_five(facts: dict, end: str):
+    return lookup(facts, _AFTER_YEAR_FIVE_TAG, end=end)
+
+
+def pull_fields(facts: dict, text: str | None = None) -> dict:
+    """Every number metrics.py needs, for the latest fiscal year, and where each came from.
+
+    `text` is the 10-K from get_latest_filing_text. XBRL doesn't tag floating-rate debt,
+    and most companies don't tag their revolver or (like apple) their interest expense, so
+    those are read from the filing instead. "tags" says which XBRL tags a number came from;
+    "excerpts" has the sentence and page for numbers read from the text, ready to become
+    fact sheet sources.
+    """
+    end = fiscal_year_end(facts)
+    fields, tags, excerpts = {}, {}, {}
+    for name, fn in [
+        ("net_income", net_income),
+        ("income_taxes", income_taxes),
+        ("interest_expense", interest_expense),
+        ("depreciation_amortization", depreciation_amortization),
+        ("ebit", ebit),
+        ("cash", cash),
+    ]:
+        val, tag = fn(facts, end)
+        fields[name], tags[name] = val, [tag] if tag else []
+    fields["total_debt"], tags["total_debt"] = total_debt(facts, end)
+    fields["undrawn_revolver"], tags["undrawn_revolver"] = undrawn_revolver(facts, end)
+    fields["maturities"] = maturities(facts, end)
+    val, tag = maturities_after_year_five(facts, end)
+    fields["maturities_after_year_five"], tags["maturities_after_year_five"] = val, [tag] if tag else []
+    fields["floating_debt"], tags["floating_debt"] = None, []
+
+    if text:
+        def from_text(name, val, excerpt):
+            fields[name], tags[name], excerpts[name] = val, [], excerpt
+
+        if fields["interest_expense"] is None:
+            val, ex = filing.income_statement_value(text, r"Interest expense(?:, net)?", date.fromisoformat(end).year)
+            if val is not None:
+                from_text("interest_expense", val, ex)
+        # the text names the revolver specifically; the XBRL tag can lump in other credit lines
+        val, ex = filing.undrawn_revolver(text)
+        if val is not None:
+            from_text("undrawn_revolver", val, ex)
+        val, ex = filing.floating_rate_debt(text, fields["total_debt"])
+        if val is not None:
+            from_text("floating_debt", val, ex)
+
+    return {"fiscal_year_end": end, "fields": fields, "tags": tags, "excerpts": excerpts}
 
 
 # bc the xbrl file is a pain to parse through, everything above came from the company facts
-
