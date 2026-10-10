@@ -674,10 +674,15 @@ def write_brief(fact_sheet: FactSheet, lines: list[LineMessage]) -> CommitteeBri
             for s, c in claims
         ],
     }
-    out = _call(
-        SYSTEM_PROMPTS["brief"], json.dumps(context, indent=1), _brief_schema([c.id for _, c in claims]), 0.3,
-        lambda o: validate_brief(o, fact_sheet, lines), thinking="low",
-    )
+    # The brief is what people leave with, and it's written while the last line plays,
+    # so it gets a second fresh attempt before falling back.
+    for _ in range(2):
+        out = _call(
+            SYSTEM_PROMPTS["brief"], json.dumps(context, indent=1), _brief_schema([c.id for _, c in claims]), 0.3,
+            lambda o: validate_brief(o, fact_sheet, lines), thinking="low",
+        )
+        if out is not None:
+            break
     if out is None:
         return CommitteeBrief(unsupported=unsupported)
     return CommitteeBrief(**out, unsupported=unsupported)
