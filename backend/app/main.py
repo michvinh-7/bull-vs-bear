@@ -69,7 +69,9 @@ app = FastAPI(title="Bull vs Bear", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[config.FRONTEND_ORIGIN, "http://localhost:3000"],
+    # FRONTEND_ORIGIN can list several sites (comma-separated), e.g. the custom domain.
+    allow_origins=[o.strip() for o in config.FRONTEND_ORIGIN.split(",") if o.strip()] + ["http://localhost:3000"],
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",  # the Vercel site and its preview links
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -170,7 +172,10 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             await pacer.wait(at_most, wake)
 
     try:
-        debate.fact_sheet = await asyncio.to_thread(build_fact_sheet, debate.ticker)
+        # Demo companies are pre-built (scripts/cache_fact_sheets.py) so the debate starts at once.
+        debate.fact_sheet = store.load_fact_sheet(debate.ticker) or await asyncio.to_thread(
+            build_fact_sheet, debate.ticker
+        )
         await ws.send_json({"type": "fact_sheet", "data": debate.fact_sheet.model_dump()})
         debate.positions = await asyncio.to_thread(agents.generate_positions, debate.fact_sheet)
         await ws.send_json({"type": "positions", "data": debate.positions.model_dump()})
