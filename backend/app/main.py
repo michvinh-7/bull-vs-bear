@@ -6,6 +6,7 @@ Endpoints
   GET  /companies/search?q=     up to 10 companies matching a name or ticker
   GET  /models                  Gemini models the user can pick in Settings, with prices
   POST /debates                 start a debate -> {debate_id}; 400 empty/unknown model, 404 unknown ticker
+  GET  /debates                 History: finished debates with a brief, newest first (summaries)
   GET  /debates/{id}            full debate for replay (fact sheet, lines, brief)
   GET  /debates/{id}/brief      committee brief only
   WS   /ws/debates/{id}         streams the debate; accepts interrupts
@@ -26,6 +27,7 @@ from .pacing import Pacer
 from .schemas import (
     CommitteeBrief,
     Debate,
+    DebateSummary,
     StartDebateRequest,
     StartDebateResponse,
 )
@@ -140,6 +142,22 @@ def start_debate(req: StartDebateRequest):
     if key:
         _user_keys[debate.id] = (key, time.monotonic())
     return StartDebateResponse(debate_id=debate.id)
+
+
+@app.get("/debates", response_model=list[DebateSummary])
+def list_debates(limit: int = Query(50, ge=1, le=200)):
+    rows = []
+    for r in store.list_finished(limit):
+        labels: dict[str, int] = {}
+        for line in r.get("lines") or []:
+            for claim in line.get("claims", []):
+                labels[claim["label"]] = labels.get(claim["label"], 0) + 1
+        rows.append(DebateSummary(
+            id=r["id"], ticker=r.get("ticker") or "", company=r.get("company"), as_of=r.get("as_of"),
+            updated_at=r.get("updated_at"), model=r.get("model"), lines=len(r.get("lines") or []),
+            labels=labels, cost_usd=r.get("cost_usd"), is_demo=bool(r.get("is_demo")),
+        ))
+    return rows
 
 
 @app.get("/debates/{debate_id}", response_model=Debate)

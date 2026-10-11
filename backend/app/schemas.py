@@ -162,6 +162,20 @@ class Debate(BaseModel):
         return next((c for line in self.lines for c in line.claims if c.id == claim_id), None)
 
 
+class DebateSummary(BaseModel):
+    """One row of the History page: a finished debate with a brief."""
+    id: str
+    ticker: str
+    company: str | None = None
+    as_of: str | None = None
+    updated_at: str | None = None  # last saved (ISO timestamp); None for in-memory runs
+    model: str | None = None
+    lines: int = 0
+    labels: dict[str, int] = Field(default_factory=dict)  # e.g. {"verified": 17, "unsupported": 1}
+    cost_usd: float | None = None
+    is_demo: bool = False
+
+
 from .usage import Usage  # noqa: E402  (usage.py imports nothing from here; placed last to keep shapes first)
 
 Debate.model_rebuild()
