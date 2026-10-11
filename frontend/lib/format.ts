@@ -25,6 +25,7 @@ const METRIC_WORDS: Record<string, string[]> = {
   floating_rate_pct: ["float", "variable rate", "variable-rate", "rate shock", " bp "],
   next_maturity_year: ["maturit", "matures", "comes due", "refinanc"],
   liquidity_usd: ["liquidity", "cash", "revolver", "runway"],
+  capex_to_cash_flow: ["capex", "capital spending", "capital expenditure", "free cash flow", "data center"],
 };
 
 /** Which metrics a line refers to, so their cards can light up while it's spoken. */

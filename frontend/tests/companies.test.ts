@@ -32,7 +32,9 @@ describe("searchCompanies (mock mode)", () => {
 
   it("matches ticker prefixes and names, case-insensitively", async () => {
     const { searchCompanies } = await load();
-    expect((await searchCompanies("am")).map((c) => c.ticker)).toEqual(["AMZN", "AMC"]);
+    expect((await searchCompanies("in")).map((c) => c.ticker)).toEqual(["INTU", "VZ"]); // ticker, then "INC." in a name
+    expect((await searchCompanies("oracle")).map((c) => c.ticker)).toEqual(["ORCL"]);
+    expect((await searchCompanies("intuit")).map((c) => c.ticker)).toEqual(["INTU"]);
     expect((await searchCompanies("verizon")).map((c) => c.ticker)).toEqual(["VZ"]);
   });
   it("returns nothing for blank input", async () => {

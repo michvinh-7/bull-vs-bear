@@ -160,3 +160,32 @@ def test_missing_xbrl_pieces_fall_back():
 def test_short_term_borrowings_alone_arent_total_debt():
     only_cp = facts(NetIncomeLoss=[year(600)], CommercialPaper=[snap(500)])
     assert edgar.total_debt(only_cp, "2026-01-31") == (None, [])
+
+
+def test_capex_and_operating_cash_flow():
+    spender = facts(
+        NetIncomeLoss=[year(600)],
+        PaymentsToAcquirePropertyPlantAndEquipment=[year(560)],
+        NetCashProvidedByUsedInOperatingActivities=[year(320)],
+    )
+    f = edgar.pull_fields(spender)["fields"]
+    assert (f["capex"], f["operating_cash_flow"]) == (560, 320)
+    assert metrics.capex_to_operating_cash_flow(f["capex"], f["operating_cash_flow"]) == 175.0
+    # a company that only tags the combined line
+    combined = facts(NetIncomeLoss=[year(600)], PaymentsToAcquireProductiveAssets=[year(90)])
+    assert edgar.pull_fields(combined)["fields"]["capex"] == 90
+    verizon = facts(NetIncomeLoss=[year(600)], PaymentsToAcquireOtherProductiveAssets=[year(170)])
+    assert edgar.pull_fields(verizon)["fields"]["capex"] == 170
+
+
+def test_combined_total_and_notes_payable_debt():
+    # oracle: one combined total, which already includes short-term debt
+    oracle = facts(DebtLongtermAndShorttermCombinedAmount=[snap(129_541)], NotesPayableCurrent=[snap(7_199)],
+                   LongTermNotesPayable=[snap(122_342)], CommercialPaper=[snap(500)])
+    assert edgar.total_debt(oracle, "2026-01-31") == (129_541, ["DebtLongtermAndShorttermCombinedAmount"])
+    # only the two halves of notes payable
+    halves = facts(LongTermNotesPayable=[snap(122_342)], NotesPayableCurrent=[snap(7_199)])
+    assert edgar.total_debt(halves, "2026-01-31") == (129_541, ["LongTermNotesPayable", "NotesPayableCurrent"])
+    # servicenow: convertible notes only
+    servicenow = facts(ConvertibleLongTermNotesPayable=[snap(1_491)])
+    assert edgar.total_debt(servicenow, "2026-01-31") == (1_491, ["ConvertibleLongTermNotesPayable"])

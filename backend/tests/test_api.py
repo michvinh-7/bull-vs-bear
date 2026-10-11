@@ -47,7 +47,7 @@ def test_health_shows_which_voice_settings_are_missing(client, monkeypatch):
 
 def test_demo_companies(client):
     body = client.get("/companies").json()
-    assert [c["ticker"] for c in body] == ["AMZN", "VZ", "AMC"]
+    assert [c["ticker"] for c in body] == ["INTU", "VZ", "ORCL"]
     assert all({"ticker", "company"} <= c.keys() and c["tagline"] for c in body)
 
 
@@ -80,7 +80,7 @@ def test_start_debate_and_fetch_it(client):
 
 
 def test_start_debate_demo_ticker(client):
-    assert client.post("/debates", json={"ticker": "amc"}).status_code == 200
+    assert client.post("/debates", json={"ticker": "orcl"}).status_code == 200
 
 
 def test_start_debate_rejects_bad_tickers(client):

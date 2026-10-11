@@ -105,8 +105,8 @@ export default function DebateRoom() {
         </p>
       ))}
 
-      {/* One swipeable row on phones, a grid from tablet up */}
-      <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-5">
+      {/* One swipeable row on phones, a grid from tablet up, one even row of however many metrics on desktop */}
+      <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-none lg:auto-cols-fr lg:grid-flow-col">
         {factSheet?.metrics.map((m) => (
           <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} sources={m.source_ids.map((sid) => findSource(factSheet, sid)?.label).filter(Boolean) as string[]} />
         ))}

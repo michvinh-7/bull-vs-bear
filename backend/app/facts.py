@@ -205,7 +205,7 @@ def fact_sheet_from(ticker: str, facts: dict, pulled: dict, url: str) -> FactShe
 
 
 def _metrics(f: dict, cite) -> list[Metric]:
-    """The five metrics the debate is built on, skipping any whose inputs weren't found."""
+    """The metrics the debate is built on, skipping any whose inputs weren't found."""
     out = []
     debt, interest = f["total_debt"], f["interest_expense"]
     ebitda = None
@@ -220,12 +220,13 @@ def _metrics(f: dict, cite) -> list[Metric]:
             formula=f"{money(debt)} debt / {money(ebitda)} EBITDA",
             source_ids=cite("total_debt", *ebitda_sources),
         ))
-    if ebitda is not None and interest:
+    if f["ebit"] is not None and interest:
         out.append(Metric(
             name="interest_coverage", label="Interest coverage", unit="x",
-            value=metrics.interest_coverage(ebitda, interest),
-            formula=f"{money(ebitda)} EBITDA / {money(interest)} interest",
-            source_ids=cite("interest_expense", *ebitda_sources),
+            value=metrics.interest_coverage(f["ebit"], interest),
+            # an operating loss reads "-$17.4 million EBIT", not "$-17.4 million"
+            formula=f"{'-' if f['ebit'] < 0 else ''}{money(abs(f['ebit']))} EBIT / {money(interest)} interest",
+            source_ids=cite("interest_expense", "ebit"),
         ))
     if debt and f["floating_debt"] is not None:
         out.append(Metric(
@@ -252,6 +253,15 @@ def _metrics(f: dict, cite) -> list[Metric]:
             formula=f"{money(f['cash'])} cash + {money(revolver)} undrawn revolver" if revolver
             else f"{money(f['cash'])} cash, no undrawn revolver reported",
             source_ids=cite("cash", "undrawn_revolver") if revolver else cite("cash"),
+        ))
+    # only meaningful when the business brings cash in; with negative operating cash flow
+    # the ratio flips sign and reads as nonsense
+    if f.get("capex") is not None and f.get("operating_cash_flow") and f["operating_cash_flow"] > 0:
+        out.append(Metric(
+            name="capex_to_cash_flow", label="Capex / operating cash flow", unit="pct",
+            value=metrics.capex_to_operating_cash_flow(f["capex"], f["operating_cash_flow"]),
+            formula=f"{money(f['capex'])} capex / {money(f['operating_cash_flow'])} operating cash flow",
+            source_ids=cite("capex", "operating_cash_flow"),
         ))
     return out
 
@@ -282,6 +292,11 @@ def _statement_excerpt(f: dict, excerpts: dict, end: str) -> str:
         parts.append(f"cash and cash equivalents of {money(f['cash'])}")
     if said("undrawn_revolver"):
         parts.append(f"undrawn revolving credit of {money(f['undrawn_revolver'])}")
+    if said("operating_cash_flow"):
+        v = f["operating_cash_flow"]
+        parts.append(f"cash {'from' if v >= 0 else 'used in'} operations of {money(abs(v))}")
+    if said("capex"):
+        parts.append(f"capital expenditures of {money(f['capex'])}")
     sentence = f"For the fiscal year ended {_long_date(end)}, the company reported " + "; ".join(parts) + "."
     if f["maturities"] and "maturities" not in excerpts:
         due = [f"{money(v)} in {y}" for y, v in sorted(f["maturities"].items())]

@@ -21,10 +21,10 @@ class Company(BaseModel):
 
 
 DEMO_COMPANIES = [
-    # one of each: a fortress balance sheet, a big steady borrower, and a stressed one
-    Company(ticker="AMZN", company="Amazon.com, Inc.", tagline="AI spending spree vs. a fortress balance sheet"),
+    # one of each: a strong balance sheet, a big steady borrower, and one stretching to fund AI
+    Company(ticker="INTU", company="Intuit Inc.", tagline="Tax-season cash machine vs. acquisition debt"),
     Company(ticker="VZ", company="Verizon Communications Inc.", tagline="Steady subscriber cash vs. a giant debt load"),
-    Company(ticker="AMC", company="AMC Entertainment Holdings, Inc.", tagline="Box office comeback vs. a mountain of debt"),
+    Company(ticker="ORCL", company="Oracle Corporation", tagline="AI data-center spending vs. a growing debt load"),
 ]
 
 _sec: list[Company] | None = None

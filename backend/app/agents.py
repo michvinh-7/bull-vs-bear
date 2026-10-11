@@ -480,6 +480,14 @@ def key_rejected(error: str | None) -> bool:
     return any(s in e for s in ("api key not valid", "api_key_invalid", "permission_denied", "401", "403"))
 
 
+def out_of_credits(error: str | None) -> bool:
+    """The Gemini account has run out of prepaid credits (HTTP 402): waiting won't help.
+    Google calls it RESOURCE_EXHAUSTED like a rate limit, so it's told apart by the 402 and
+    its wording, not by that status."""
+    e = (error or "").lower()
+    return any(s in e for s in ("402", "credits are depleted", "prepayment credits"))
+
+
 def _generate(system: str, user: str, schema: type[BaseModel], temperature: float, thinking: str = "minimal") -> dict:
     from google.genai import types
 
@@ -510,7 +518,10 @@ _sleep = time.sleep  # tests swap this
 
 
 def is_transient(e: Exception) -> bool:
-    """Worth retrying: rate limits, overload, server errors, timeouts. Not bad keys or bad requests."""
+    """Worth retrying: rate limits, overload, server errors, timeouts. Not bad keys, bad
+    requests or an account that's out of credits."""
+    if getattr(e, "code", None) == 402 or out_of_credits(f"{e}"):
+        return False
     if getattr(e, "code", None) in (429, 500, 502, 503, 504):
         return True
     text = f"{type(e).__name__} {e}".lower()

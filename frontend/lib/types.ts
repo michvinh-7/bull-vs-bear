@@ -20,7 +20,7 @@ export interface Metric {
   label: string;
   value: number;
   unit: "x" | "pct" | "usd" | "year";
-  formula: string; // Python's working, e.g. "$310M EBITDA / $163M interest"
+  formula: string; // Python's working, e.g. "$205M EBIT / $108M interest"
   source_ids: string[];
 }
 

@@ -19,7 +19,7 @@ bull-vs-bear/
 │   │   ├── main.py        #   Person 2: endpoints + debate loop
 │   │   ├── schemas.py     #   the 3 shared shapes (pydantic)
 │   │   ├── edgar.py       #   Person 1: SEC EDGAR
-│   │   ├── metrics.py     #   Person 1: debt-to-EBITDA, coverage, floating %, maturities, total immediate liquidity
+│   │   ├── metrics.py     #   Person 1: debt-to-EBITDA, coverage, floating %, maturities, total immediate liquidity, capex / operating cash flow
 │   │   ├── facts.py       #   Person 1: builds the fact sheet
 │   │   ├── verify.py      #   Person 1: Hugging Face fact-checking
 │   │   ├── agents.py      #   Person 2: Gemini bull / bear / moderator / brief

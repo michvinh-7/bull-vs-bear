@@ -53,7 +53,8 @@ def test_sources_and_metrics():
     m = {x.name: x for x in sheet.metrics}
     assert list(m) == ["leverage", "interest_coverage", "floating_rate_pct", "next_maturity_year", "liquidity_usd"]
     assert (m["leverage"].value, m["leverage"].formula) == (3.32, "$158.2 billion debt / $47.6 billion EBITDA")
-    assert m["interest_coverage"].value == 7.11
+    # EBIT / interest: $29.3 billion / $6.7 billion
+    assert (m["interest_coverage"].value, m["interest_coverage"].formula) == (4.37, "$29.3 billion EBIT / $6.7 billion interest")
     assert (m["floating_rate_pct"].value, m["floating_rate_pct"].source_ids) == (21.0, ["S2", "S3"])
     assert m["next_maturity_year"].value == 2026
     assert (m["liquidity_usd"].value, m["liquidity_usd"].source_ids) == (31_048e6, ["S1", "S3"])
@@ -81,6 +82,12 @@ def test_metrics_with_missing_inputs_are_left_out():
     m = {x.name: x for x in sheet.metrics}
     assert list(m) == ["leverage", "liquidity_usd"]
     assert m["liquidity_usd"].formula == "$19 billion cash, no undrawn revolver reported"
+
+
+def test_coverage_is_negative_with_an_operating_loss():
+    sheet = facts.fact_sheet_from("AMC", FACTS, pulled(fields={"ebit": -17.4e6, "interest_expense": 459.5e6}), URL)
+    coverage = next(x for x in sheet.metrics if x.name == "interest_coverage")
+    assert (coverage.value, coverage.formula) == (-0.04, "-$17.4 million EBIT / $459.5 million interest")
 
 
 def test_losses_read_as_losses():
@@ -264,3 +271,20 @@ def test_edgar_outage_reaches_the_debate_page(monkeypatch):
     assert msg["type"] == "error"
     assert msg["message"] == ("We couldn't get VZ's filings. SEC EDGAR isn't responding right now; it may be down "
                               "or busy. Try again in a few minutes, or replay a saved debate.")
+
+
+def test_capex_to_operating_cash_flow():
+    sheet = facts.fact_sheet_from("ORCL", FACTS, pulled(fields={"capex": 55.7e9, "operating_cash_flow": 32.0e9}), URL)
+    m = {x.name: x for x in sheet.metrics}
+    capex = m["capex_to_cash_flow"]
+    assert (capex.label, capex.value, capex.unit) == ("Capex / operating cash flow", 174.1, "pct")
+    assert capex.formula == "$55.7 billion capex / $32 billion operating cash flow"
+    statements = next(s for s in sheet.sources if s.label == "10-K · Financial statements")
+    assert capex.source_ids == [statements.id]
+    assert "cash from operations of $32 billion; capital expenditures of $55.7 billion" in statements.excerpt
+
+
+def test_capex_ratio_skipped_when_operations_burn_cash():
+    sheet = facts.fact_sheet_from("AMC", FACTS, pulled(fields={"capex": 0.2e9, "operating_cash_flow": -0.1e9}), URL)
+    assert "capex_to_cash_flow" not in {x.name for x in sheet.metrics}
+    assert "cash used in operations of $100 million" in sheet.sources[-1].excerpt

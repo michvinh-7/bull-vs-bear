@@ -30,7 +30,7 @@ class Metric(BaseModel):
     label: str = Field(description='Display name, e.g. "Interest coverage"')
     value: float
     unit: Literal["x", "pct", "usd", "year"]
-    formula: str = Field("", description='Python-computed working, e.g. "$310M EBITDA / $163M interest"')
+    formula: str = Field("", description='Python-computed working, e.g. "$205M EBIT / $108M interest"')
     source_ids: list[str] = Field(default_factory=list)
 
 
