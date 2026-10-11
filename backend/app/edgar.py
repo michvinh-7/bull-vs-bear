@@ -285,9 +285,10 @@ def pretax_income(facts: dict, end: str):
 
 
 # cash flow statement pieces, for how much of the year's operating cash went into capex
-def capex(facts: dict, end: str):
-    """Cash spent on property and equipment (data centers, stores, planes), as a positive number."""
-    return lookup(
+def capex(facts: dict, end: str) -> tuple[float | None, list[str]]:
+    """Cash spent on property and equipment (data centers, stores, planes) and on building
+    the company's own software, as a positive number."""
+    val, tag = lookup(
         facts,
         "PaymentsToAcquirePropertyPlantAndEquipment",
         "PaymentsToAcquireProductiveAssets",
@@ -295,6 +296,16 @@ def capex(facts: dict, end: str):
         "PaymentsToAcquireOtherProductiveAssets",  # verizon's network spending
         end=end,
     )
+    if val is None:
+        return None, []
+    # software companies put "Capitalization of internal use software" on its own cash flow
+    # line (intuit: $175M property + $46M software). Only added to the pure property tag: the
+    # broader ones (verizon's, "...AndIntangibleAssets") already include it.
+    if tag == "PaymentsToAcquirePropertyPlantAndEquipment":
+        software, software_tag = lookup(facts, "PaymentsToDevelopSoftware", end=end)
+        if software:
+            return val + software, [tag, software_tag]
+    return val, [tag]
 
 
 def operating_cash_flow(facts: dict, end: str):

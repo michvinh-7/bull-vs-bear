@@ -189,3 +189,14 @@ def test_combined_total_and_notes_payable_debt():
     # servicenow: convertible notes only
     servicenow = facts(ConvertibleLongTermNotesPayable=[snap(1_491)])
     assert edgar.total_debt(servicenow, "2026-01-31") == (1_491, ["ConvertibleLongTermNotesPayable"])
+
+
+def test_capex_includes_capitalized_software():
+    # intuit: "Purchases of property and equipment" $175M + "Capitalization of internal use software" $46M
+    intuit = facts(NetIncomeLoss=[year(600)], PaymentsToAcquirePropertyPlantAndEquipment=[year(175)],
+                   PaymentsToDevelopSoftware=[year(46)])
+    assert edgar.capex(intuit, "2026-01-31") == (221, ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToDevelopSoftware"])
+    # a broader capex tag already includes software, so it isn't added again
+    broader = facts(NetIncomeLoss=[year(600)], PaymentsToAcquireOtherProductiveAssets=[year(170)],
+                    PaymentsToDevelopSoftware=[year(46)])
+    assert edgar.capex(broader, "2026-01-31") == (170, ["PaymentsToAcquireOtherProductiveAssets"])
