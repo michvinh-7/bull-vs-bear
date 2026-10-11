@@ -96,9 +96,9 @@ HARD RULES. Code checks your output; breaking any rule rejects the turn.
    to them plainly; they may not know finance terms.
 6. NO TRADE CALLS. Never say buy, sell, short, go long, recommend, or anything
    telling the listener what to do with money. You argue; the human decides.
-7. NO REPEATS. Never repeat a fact from YOUR_RECENT_CLAIMS (your last 2 turns),
-   even in new words. Bring a new fact or a new angle. Older facts may come
-   back if they answer the point in front of you.
+7. SOMETHING NEW. At least one claim each turn must be a fact that is not in
+   YOUR_RECENT_CLAIMS (your previous turn), even in new words. You may come back
+   to a fact when it answers the point in front of you, as long as you add a new one.
 """
 
 SYSTEM_PROMPTS = {
@@ -307,12 +307,14 @@ def validate_turn(
     claims = out.get("claims", [])
     if not CLAIMS[0] <= len(claims) <= CLAIMS[1]:
         errs.append(f"{len(claims)} claims; must be {CLAIMS[0]}-{CLAIMS[1]}.")
-    # Only the side's own last 2 turns count: fact sheets are small, so key facts must be able to come back.
+    # Only the side's own previous turn counts, and only a line with nothing new is rejected:
+    # fact sheets are small, so key facts must be able to come back in a rebuttal.
     recent = _recent_claims(history, speaker)
     earlier = [c.text for c in recent]
     # Same source, same number = the same fact said again in new words.
     used = {(c.source_id, n) for c in recent for n in numbers(c.text)}
     cited: set[str] = set()
+    repeats = 0
     for i, c in enumerate(claims, 1):
         source = fact_sheet.source(c.get("source_id"))
         if source is None:
@@ -326,7 +328,9 @@ def validate_turn(
         if any(same_fact(c.get("text", ""), e) for e in earlier) or {
             (source.id, n) for n in numbers(c.get("text", ""))
         } & used:
-            errs.append(f"claim {i}: repeats a fact from YOUR_RECENT_CLAIMS; bring a new one.")
+            repeats += 1
+    if claims and repeats == len(claims):
+        errs.append("every claim repeats a fact from YOUR_RECENT_CLAIMS; add at least one new fact.")
 
     allowed = numbers(_number_text(fact_sheet, cited)) | numbers(target.text if target else "") | numbers(question or "")
     if stray := numbers(text) - allowed:
@@ -339,7 +343,7 @@ def validate_turn(
     return errs
 
 
-def _recent_claims(history: list[LineMessage], speaker: str, turns: int = 2) -> list[Claim]:
+def _recent_claims(history: list[LineMessage], speaker: str, turns: int = 1) -> list[Claim]:
     own = [line for line in history if line.speaker == speaker][-turns:]
     return [c for line in own for c in line.claims]
 

@@ -128,11 +128,21 @@ def test_same_side_cannot_repeat_a_fact_in_new_words(gemini):
     assert "repeats a fact" in prompts[1]
 
 
-def test_facts_older_than_two_own_turns_may_come_back(gemini):
+def test_a_repeated_fact_is_fine_next_to_a_new_one(gemini):
+    replies, _ = gemini
+    history = [line("bull", 1, [("Northwind had $110 million of cash.", "S4", "verified")])]
+    replies.append({"text": "They still hold $110 million of cash. The term loan is secured.",
+                    "claims": [{"text": "Northwind held $110 million of cash.", "source_id": "S4",
+                                "quote": "we had $110 million of cash"},
+                               {**GOOD_BULL["claims"][0]}]})
+    out = agents.generate_turn(SHEET, history, "bull", 3, target=None)
+    assert out is not None and len(out.claims) == 2  # the repeat keeps its claim, so it still gets a label
+
+
+def test_facts_from_before_the_previous_own_turn_may_come_back(gemini):
     replies, _ = gemini
     history = [line("bull", 1, [("Northwind had $110 million of cash.", "S4", "verified")]),
-               line("bull", 3, [("The term loan matures in 2028.", "S2", "verified")]),
-               line("bull", 5, [("Store closures cut costs.", "N1", "verified")])]
+               line("bull", 3, [("The term loan matures in 2028.", "S2", "verified")])]
     replies.append({"text": "They hold $110 million of cash. That is real cushion.",
                     "claims": [{"text": "Northwind held $110 million of cash.", "source_id": "S4",
                                 "quote": "we had $110 million of cash"}]})
@@ -272,6 +282,23 @@ def test_dropped_turn_gets_a_fresh_try_from_the_same_side(client, monkeypatch):
     assert calls[:3] == ["bull", "bear", "bear"]
     analysts = [s for s, _ in speakers(msgs) if s != "moderator"]
     assert analysts.count("bull") == analysts.count("bear") == 2
+
+
+def test_every_turn_gets_its_own_fresh_try(client, monkeypatch):
+    """Each turn's first attempt fails: with a shared budget the later turns were lost, now none are."""
+    real, seen = agents.generate_turn, set()
+
+    def first_try_fails(sheet, history, side, turn, question=None, target="auto"):
+        if len(history) not in seen:
+            seen.add(len(history))
+            return None
+        return real(sheet, history, side, turn, question, target)
+
+    monkeypatch.setattr(agents, "generate_turn", first_try_fails)
+    store.save_debate(Debate(id="d8", ticker="NWRC", max_turns=6))
+    names = [s for s, _ in speakers(run(client, "d8"))]
+    assert len([s for s in names if s != "moderator"]) == 6
+    assert all(a != b for a, b in zip(names, names[1:]) if "moderator" not in (a, b)), names
 
 
 def test_never_the_same_side_twice_even_when_turns_keep_failing(client, monkeypatch):
