@@ -442,7 +442,9 @@ async def _listen(ws: WebSocket, interrupts: asyncio.Queue, pacer: Pacer, gone: 
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "interrupt" and msg.get("question"):
-                await interrupts.put(msg["question"])
+                question = str(msg["question"]).strip()[: config.MAX_QUESTION_CHARS]
+                if question:
+                    await interrupts.put(question)
             elif msg.get("type") == "played" and isinstance(msg.get("turn"), int):
                 pacer.played(msg["turn"])
     except (WebSocketDisconnect, RuntimeError):

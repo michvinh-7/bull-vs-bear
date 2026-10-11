@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { closedReason, MAX_QUESTIONS, serverFinished, type QuestionState } from "@/lib/questions";
+import { readFileSync } from "node:fs";
+import { closedReason, MAX_QUESTION_CHARS, MAX_QUESTIONS, serverFinished, type QuestionState } from "@/lib/questions";
 
 const open: QuestionState = { replay: false, done: false, serverFinished: false, asked: 0, waiting: false };
 
@@ -39,4 +40,12 @@ describe("serverFinished", () => {
   it("is true once the brief arrives", () => {
     expect(serverFinished({ brief: true })).toBe(true);
   });
+});
+
+describe("limits match the backend", () => {
+  const config = readFileSync(new URL("../../backend/app/config.py", import.meta.url), "utf8");
+  const backendDefault = (name: string) => Number(config.match(new RegExp(`${name} = int\\(_env\\("${name}", "(\\d+)"\\)\\)`))?.[1]);
+
+  it("question length", () => expect(MAX_QUESTION_CHARS).toBe(backendDefault("MAX_QUESTION_CHARS")));
+  it("questions per debate", () => expect(MAX_QUESTIONS).toBe(backendDefault("MAX_INTERRUPTS")));
 });
