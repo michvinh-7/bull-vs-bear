@@ -62,7 +62,7 @@
       "label": "Interest coverage",
       "value": 1.9,
       "unit": "x",
-      "formula": "$310M EBITDA / $163M interest",
+      "formula": "$205M EBIT / $108M interest",
       "source_ids": [
         "S1",
         "S3"

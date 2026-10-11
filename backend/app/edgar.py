@@ -163,6 +163,12 @@ reports the split, + ShortTermBorrowings + CommercialPaper
   current:    DebtCurrent (already includes short-term borrowings and commercial paper, so those
               aren't added again - verizon would double count otherwise), else LongTermDebtCurrent
   noncurrent: LongTermDebtNoncurrent/LongTermDebtAndCapitalLeaseObligations (macy's uses this one; it includes finance leases)
+If none of those are tagged, in order:
+  one combined total: LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities (GM),
+    DebtAndCapitalLeaseObligations, NotesPayable (realty income and other REITs)
+  DebtLongtermAndShorttermCombinedAmount, which already includes short-term debt (oracle, super micro)
+  notes split in two: LongTermNotesPayable + NotesPayableCurrent (oracle's halves), or
+    ConvertibleLongTermNotesPayable + ConvertibleNotesPayableCurrent (servicenow)
 
 [NOTE]: unsure on adding the following fields for now- will be doing research 
 UnsecuredDebtMember/DebenturesMember
@@ -194,6 +200,24 @@ def total_debt(facts: dict, end: str) -> tuple[float | None, list[str]]:
         )
         if val is not None:
             debts[tag] = val
+    if not debts:
+        # oracle tags only this total of long- and short-term debt; there's nothing to add to it
+        val, tag = lookup(facts, "DebtLongtermAndShorttermCombinedAmount", end=end)
+        if val is not None:
+            return val, [tag]
+    if not debts:
+        # notes payable split into long-term and current, or convertible notes (servicenow)
+        for noncurrent_tags, current_tags in (
+            (("LongTermNotesPayable",), ("NotesPayableCurrent", "DebtCurrent")),
+            (("ConvertibleLongTermNotesPayable", "ConvertibleNotesPayable"), ("ConvertibleNotesPayableCurrent",)),
+        ):
+            noncurrent, noncurrent_tag = lookup(facts, *noncurrent_tags, end=end)
+            if noncurrent is not None:
+                debts[noncurrent_tag] = noncurrent
+                current, current_tag = lookup(facts, *current_tags, end=end)
+                if current is not None:
+                    debts[current_tag] = current
+                break
     if not debts:
         # short-term borrowings alone would make a big borrower look tiny, so give up instead
         return None, []
@@ -256,6 +280,28 @@ def pretax_income(facts: dict, end: str):
         facts,
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+        end=end,
+    )
+
+
+# cash flow statement pieces, for how much of the year's operating cash went into capex
+def capex(facts: dict, end: str):
+    """Cash spent on property and equipment (data centers, stores, planes), as a positive number."""
+    return lookup(
+        facts,
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "PaymentsToAcquireProductiveAssets",
+        "PaymentsToAcquirePropertyPlantAndEquipmentAndIntangibleAssets",
+        "PaymentsToAcquireOtherProductiveAssets",  # verizon's network spending
+        end=end,
+    )
+
+
+def operating_cash_flow(facts: dict, end: str):
+    return lookup(
+        facts,
+        "NetCashProvidedByUsedInOperatingActivities",
+        "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
         end=end,
     )
 
@@ -346,6 +392,8 @@ def pull_fields(facts: dict, text: str | None = None) -> dict:
         ("cash", cash),
         ("total_debt", total_debt),
         ("undrawn_revolver", undrawn_revolver),
+        ("capex", capex),
+        ("operating_cash_flow", operating_cash_flow),
     ]:
         from_xbrl(name, *fn(facts, end))
     fields["maturities"] = maturities(facts, end)

@@ -81,7 +81,7 @@
         },
         "formula": {
           "default": "",
-          "description": "Python-computed working, e.g. \"$310M EBITDA / $163M interest\"",
+          "description": "Python-computed working, e.g. \"$205M EBIT / $108M interest\"",
           "title": "Formula",
           "type": "string"
         },

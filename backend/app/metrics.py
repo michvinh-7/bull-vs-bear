@@ -35,6 +35,15 @@ Ease in which an asset or security can become cash.
 Usually a ratio
 Here, we are using the undrawn revolver amount which is only used when a borrower can sign/affirm that there is no upcoming default.
 This would be a loan between corporate banks and clients - this has fees for the banks to benefit from (upfront, utlization/drawn margin, committment fees.)
+
+Capex / Operating Cash Flow:
+[Purchases of property, plant and equipment]/[Net cash provided by operating activities]
+How much of the cash the business brings in goes straight back into building things (data
+centers, stores, networks). Over 100% means it spent more than it brought in and funded the
+rest with cash on hand or borrowing - a sign of heavy (e.g. AI) investment.
+Uses purchases of PP&E, not total cash flows from investing activities: that total also
+includes acquisitions and buying/selling securities, which would swamp the capex figure.
+Not shown when operating cash flow is negative (the ratio's sign would be meaningless).
 """
 
 
@@ -53,9 +62,10 @@ def leverage(total_debt: float, ebitda: float) -> float:
     return round(total_debt / ebitda, 2)
 
 
-def interest_coverage(ebitda: float, interest_expense: float) -> float:
-    """EBITDA / interest expense, in turns (x). Swap to EBIT if the team prefers."""
-    return round(ebitda / interest_expense, 2)
+def interest_coverage(ebit: float, interest_expense: float) -> float:
+    """EBIT (operating income) / interest expense, in turns (x): how many times operating
+    earnings cover the interest bill. Negative when the company has an operating loss."""
+    return round(ebit / interest_expense, 2)
 
 
 def floating_rate_pct(floating_debt: float, total_debt: float) -> float:
@@ -75,12 +85,14 @@ def next_big_maturity(maturities: dict[int, float], threshold_pct: float = 10, t
     return None
 
 
+def capex_to_operating_cash_flow(capex: float, operating_cash_flow: float) -> float:
+    """Capex as a share of operating cash flow, 0-100+. Over 100% means the company spent
+    more on property and equipment than its business brought in, and had to fund the rest
+    with cash on hand or borrowing (Oracle's AI data centers: 174% in fiscal 2026)."""
+    return round(100 * capex / operating_cash_flow, 1)
+
+
 def liquidity(cash: float, undrawn_revolver: float) -> float:
     """Total immediate liquidity: cash plus undrawn revolver capacity."""
     return cash + undrawn_revolver
 
-
-def coverage_after_rate_shock(ebitda: float, interest_expense: float, floating_debt: float, bps: int) -> float:
-    """Coverage if floating-rate debt reprices up by `bps` basis points."""
-    shocked_interest = interest_expense + floating_debt * bps / 10_000
-    return round(ebitda / shocked_interest, 2)

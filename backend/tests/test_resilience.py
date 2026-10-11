@@ -45,6 +45,43 @@ def gemini(monkeypatch):
 
 # ---- Gemini ----
 
+DEPLETED = "402 RESOURCE_EXHAUSTED. Your prepayment credits are depleted. Please go to AI Studio to manage billing."
+
+
+def test_out_of_credits_is_not_retried(gemini):
+    script, sleeps = gemini
+    script += [APIError(402)]
+    assert agents.generate_turn(SHEET, [], "bull", 1) is None
+    assert sleeps == [] and agents.out_of_credits(agents.last_error)
+
+
+@pytest.mark.parametrize("error, depleted", [
+    (DEPLETED, True),
+    ("429 RESOURCE_EXHAUSTED. You exceeded your current quota, please check your plan and billing details.", False),
+    ("503 UNAVAILABLE. The model is overloaded.", False),
+    (None, False),
+])
+def test_out_of_credits_is_told_apart_from_a_rate_limit(error, depleted):
+    assert agents.out_of_credits(error) is depleted
+
+
+def test_debate_says_when_gemini_is_out_of_credits(monkeypatch):
+    monkeypatch.setattr(config, "PACING", False)
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "fake")
+    monkeypatch.setattr(store, "_client", None)
+    monkeypatch.setattr(store, "_debates", {})
+
+    def depleted(*a):
+        raise RuntimeError(DEPLETED)
+    monkeypatch.setattr(agents, "_generate", depleted)
+    store.save_debate(Debate(id="credits", ticker="NWRC", max_turns=4))
+    msgs = []
+    with TestClient(main.app).websocket_connect("/ws/debates/credits") as ws:
+        while not msgs or msgs[-1]["type"] not in ("brief", "error"):
+            msgs.append(ws.receive_json())
+    assert msgs[-1] == {"type": "error", "message": "The Gemini account this app uses is out of credits, so debates "
+                                                    "can't run right now. Saved debates can still be replayed."}
+
 def test_busy_gemini_is_retried(gemini):
     script, sleeps = gemini
     script += [APIError(503), GOOD_TURN]

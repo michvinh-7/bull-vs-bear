@@ -9,9 +9,9 @@ export interface DemoCompany {
 // The three demo companies (same as DEMO_COMPANIES in backend/app/companies.py). Shown before
 // GET /companies answers and if it fails. In mock mode each one plays the Northwind sample debate.
 export const MOCK_COMPANIES: DemoCompany[] = [
-  { ticker: "AMZN", company: "Amazon.com, Inc.", tagline: "AI spending spree vs. a fortress balance sheet" },
+  { ticker: "INTU", company: "Intuit Inc.", tagline: "Tax-season cash machine vs. acquisition debt" },
   { ticker: "VZ", company: "Verizon Communications Inc.", tagline: "Steady subscriber cash vs. a giant debt load" },
-  { ticker: "AMC", company: "AMC Entertainment Holdings, Inc.", tagline: "Box office comeback vs. a mountain of debt" },
+  { ticker: "ORCL", company: "Oracle Corporation", tagline: "AI data-center spending vs. a growing debt load" },
 ];
 
 export async function getCompanies(): Promise<DemoCompany[]> {

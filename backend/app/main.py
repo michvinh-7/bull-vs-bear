@@ -255,6 +255,14 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             # quietly finishing with no lines.
             api_failures = api_failures + 1 if line is None and agents.last_error else 0
             if api_failures >= 2:
+                if agents.out_of_credits(agents.last_error):
+                    raise RuntimeError(
+                        "Your Gemini account is out of credits, so the debate can't continue. Add credits "
+                        "in Google AI Studio, or remove your key in Settings to use the default."
+                        if key else
+                        "The Gemini account this app uses is out of credits, so debates can't run right now. "
+                        "Saved debates can still be replayed."
+                    )
                 if key and agents.key_rejected(agents.last_error):
                     raise RuntimeError(
                         f"Your Gemini API key was rejected for {debate.model} ({agents.last_error}). "
