@@ -34,6 +34,16 @@ def test_health(client, monkeypatch):
     assert "secret-value" not in str(body)
 
 
+def test_health_shows_which_voice_settings_are_missing(client, monkeypatch):
+    from app import config, voice
+    monkeypatch.setattr(config, "ELEVENLABS_API_KEY", "el-secret")
+    monkeypatch.setitem(voice.VOICES, "bull", "bull-voice-id")
+    monkeypatch.setitem(voice.VOICES, "bear", "")
+    setup = client.get("/health").json()["voice_setup"]
+    assert setup["key"] == "set" and setup["bull"] == "set" and setup["bear"] == "missing"
+    assert "el-secret" not in str(setup) and "bull-voice-id" not in str(setup)
+
+
 def test_demo_companies(client):
     body = client.get("/companies").json()
     assert [c["ticker"] for c in body] == ["AMZN", "VZ", "AMC"]
