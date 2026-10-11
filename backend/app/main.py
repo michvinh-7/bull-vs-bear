@@ -12,6 +12,7 @@ Endpoints
   WS   /ws/debates/{id}         streams the debate; accepts interrupts
 """
 import asyncio
+import re
 import threading
 import time
 import uuid
@@ -324,9 +325,11 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             planned += 3
             await emit(agents.relay_question(question, await start("moderator")))  # shown at once
             await pace()
-            await answer(next_side, question, target=None)  # answers the user, nothing to rebut
+            # The side the user named answers first ("Bull, why ..."); otherwise the side that was due.
+            first = addressed_side(question) or next_side
+            await answer(first, question, target=None)  # answers the user, nothing to rebut
             await pace()
-            await answer(_other(next_side), question)  # answers too, and engages the first answer
+            await answer(_other(first), question)  # answers too, and engages the first answer
 
         next_side, spoken, cross_examined = "bull", 0, False
         redo = True  # every turn gets one fresh try if dropped, so one bad patch can't wipe out several turns
@@ -427,6 +430,25 @@ def _speak(text, speaker, debate_id, turn) -> str:
     except Exception as e:
         print(f"[voice] failed, line plays as text: {e}")
         return ""
+
+
+# A side counts as addressed only when spoken to: "Bull, ...", "..., bear?", "for the bull",
+# "ask the bear". Market talk ("bear market", "bullish") doesn't count.
+_ADDRESS = {
+    side: re.compile(
+        rf"^\W*(?:hey|ok(?:ay)?|so|and)?\W*{side}\b(?!ish)"  # opens with the name
+        rf"|\b{side}\s*[,:;?!]"  # name followed by punctuation
+        rf"|\b(?:for|to|ask|asking)\s+(?:the\s+)?{side}\b(?!ish)",  # "for the bull", "ask the bear"
+        re.IGNORECASE,
+    )
+    for side in ("bull", "bear")
+}
+
+
+def addressed_side(question: str) -> str | None:
+    """Which side a user's question is put to, if exactly one is named."""
+    named = [side for side, pattern in _ADDRESS.items() if pattern.search(question)]
+    return named[0] if len(named) == 1 else None
 
 
 def _other(side: str) -> str:
