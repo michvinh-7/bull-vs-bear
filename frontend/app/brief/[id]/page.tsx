@@ -9,6 +9,7 @@ import Mascot from "@/components/debate/Mascot";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Logo from "@/components/Logo";
+import NewDebateButton from "@/components/NewDebateButton";
 import SettingsSheet from "@/components/SettingsSheet";
 import { ThemeToggle } from "@/components/theme";
 import { Button } from "@/components/ui/button";
@@ -206,6 +207,7 @@ function Shell({ id, usage, children }: { id: string; usage?: Usage | null; chil
         <Logo />
         <div className="flex items-center gap-1">
           <ReplayButton id={id} variant="ghost" />
+          <NewDebateButton />
           <SettingsSheet current={usage} />
           <ThemeToggle />
         </div>

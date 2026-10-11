@@ -117,7 +117,7 @@ export interface Usage {
 export interface Debate {
   id: string;
   ticker: string;
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "error" | "interrupted";
   max_turns: number;
   model?: string | null;
   usage?: Usage | null;
@@ -134,6 +134,7 @@ export type ServerMessage =
   | { type: "line"; data: LineMessage }
   | { type: "brief"; data: CommitteeBrief }
   | { type: "usage"; data: Usage }
+  | { type: "interrupted" } // reconnected to a half-finished debate (e.g. a refresh); it never restarts
   | { type: "error"; message: string };
 
 export type ClientMessage = { type: "interrupt"; question: string };

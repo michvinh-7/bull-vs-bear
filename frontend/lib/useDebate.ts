@@ -33,6 +33,8 @@ export function useDebate(debateId: string) {
   replayRef.current = replay;
   // Tokens, calls, voice characters and estimated cost so far (sent by the backend).
   const [usage, setUsage] = useState<Usage | null>(null);
+  // Reopened (e.g. refreshed) mid-debate: the server replays what was said and won't continue.
+  const [interrupted, setInterrupted] = useState(false);
   const usageRef = useRef<Usage | null>(null);
   // Mock runs get their own id so each one adds to the browser total.
   const runId = useRef(debateId === "mock" ? `mock-${Date.now()}` : debateId);
@@ -54,6 +56,11 @@ export function useDebate(debateId: string) {
           setThinking(null);
           setLines((prev) => [...prev, msg.data]);
           if (msg.data.from_user) setPendingQuestion(null);
+          break;
+        case "interrupted":
+          setInterrupted(true);
+          setThinking(null);
+          setStatus("done");
           break;
         case "usage":
           usageRef.current = msg.data;
@@ -77,7 +84,9 @@ export function useDebate(debateId: string) {
   useEffect(() => {
     // Recordings (demo-<TICKER>) are replays: nobody is there to answer questions.
     if (isDemoId(debateId) || new URLSearchParams(window.location.search).get("replay") === "1") setReplay(true);
-    else if (!USE_MOCK) getDebate(debateId).then((d) => setReplay(d.status === "done")).catch(() => {});
+    else if (!USE_MOCK) getDebate(debateId)
+        .then((d) => setReplay(d.status === "done" || d.status === "interrupted"))
+        .catch(() => {});
   }, [debateId]);
 
   useEffect(() => {
@@ -159,5 +168,5 @@ export function useDebate(debateId: string) {
     [handle],
   );
 
-  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage, reportPlayed };
+  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage, reportPlayed, interrupted };
 }

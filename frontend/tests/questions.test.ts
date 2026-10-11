@@ -7,6 +7,9 @@ describe("closedReason", () => {
   it("is open by default", () => {
     expect(closedReason(open)).toBeNull();
   });
+  it("closes when the debate was interrupted (reopened mid-debate), before anything else", () => {
+    expect(closedReason({ ...open, interrupted: true, replay: true, asked: 9 })).toMatch(/interrupted/);
+  });
   it("closes during a replay, whatever else is true", () => {
     expect(closedReason({ ...open, replay: true, done: true, asked: 9 })).toMatch(/replay/);
   });

@@ -149,7 +149,7 @@ class StartDebateResponse(BaseModel):
 class Debate(BaseModel):
     id: str
     ticker: str
-    status: Literal["running", "done", "error"] = "running"
+    status: Literal["running", "done", "error", "interrupted"] = "running"  # interrupted: the browser left mid-debate
     max_turns: int = 8
     model: str | None = None  # Gemini model this debate runs on
     usage: "Usage | None" = None  # tokens, calls, voice characters and estimated cost so far
