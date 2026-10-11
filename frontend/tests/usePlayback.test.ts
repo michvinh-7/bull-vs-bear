@@ -157,6 +157,26 @@ describe("usePlayback", () => {
     expect(clips.map((c) => c.url)).toEqual(["/clip-1.m4a", "/clip-1.m4a"]);
   });
 
+  it("reports each line as played, in order, only when its clip ends", () => {
+    const played: number[] = [];
+    renderHook((ls: LineMessage[]) => usePlayback(ls, (t) => played.push(t)), [line(1, "bull"), line(2, "bear")]);
+    advance(0);
+    expect(played).toEqual([]); // still playing
+    endClip(0);
+    expect(played).toEqual([1]);
+    advance(350);
+    endClip(1);
+    expect(played).toEqual([1, 2]);
+  });
+
+  it("doesn't report a line the browser refused to play", () => {
+    const played: number[] = [];
+    renderHook((ls: LineMessage[]) => usePlayback(ls, (t) => played.push(t)), [line(1, "bull")]);
+    advance(0);
+    act(() => clips[0].cb.onBlocked());
+    expect(played).toEqual([]);
+  });
+
   it("stops the current clip when the page closes", () => {
     const { unmount } = renderHook(usePlayback, [line(1, "bull")]);
     advance(0);

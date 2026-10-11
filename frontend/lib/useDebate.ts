@@ -110,6 +110,13 @@ export function useDebate(debateId: string) {
     return () => ws.close();
   }, [debateId, handle]);
 
+  /** Line `turn` finished playing: the backend paces itself one line ahead of this. */
+  const reportPlayed = useCallback((turn: number) => {
+    if (USE_MOCK || replayRef.current) return; // nothing is listening
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "played", turn }));
+  }, []);
+
   const interrupt = useCallback(
     (question: string) => {
       setPendingQuestion(question);
@@ -127,5 +134,5 @@ export function useDebate(debateId: string) {
     [handle],
   );
 
-  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage };
+  return { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage, reportPlayed };
 }

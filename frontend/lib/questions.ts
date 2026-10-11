@@ -19,7 +19,11 @@ export function closedReason(s: QuestionState): string | null {
   return null;
 }
 
-/** The backend has written its last line once the brief arrives, or every planned turn is in. */
-export function serverFinished(opts: { brief: boolean; lines: number; maxTurns: number | null; thinking: boolean }) {
-  return opts.brief || (opts.maxTurns !== null && opts.lines >= opts.maxTurns && !opts.thinking);
+/**
+ * The backend stops taking questions when it sends the brief. It paces itself to
+ * the audio and keeps taking questions until the last line has been heard, so
+ * "every planned line has arrived" is not the end; the brief is.
+ */
+export function serverFinished(opts: { brief: boolean }) {
+  return opts.brief;
 }

@@ -14,7 +14,7 @@ describe("resolveTicker", () => {
     expect(resolveTicker("apple", results)).toBe("AAPL");
   });
   it("uses the raw text, uppercased, when there are no suggestions", () => {
-    expect(resolveTicker("  nwrc ", [])).toBe("NWRC");
+    expect(resolveTicker("  amc ", [])).toBe("AMC");
   });
 });
 
@@ -32,8 +32,8 @@ describe("searchCompanies (mock mode)", () => {
 
   it("matches ticker prefixes and names, case-insensitively", async () => {
     const { searchCompanies } = await load();
-    expect((await searchCompanies("nw")).map((c) => c.ticker)).toEqual(["NWRC"]);
-    expect((await searchCompanies("steel")).map((c) => c.ticker)).toEqual(["FBKM"]);
+    expect((await searchCompanies("am")).map((c) => c.ticker)).toEqual(["AMZN", "AMC"]);
+    expect((await searchCompanies("verizon")).map((c) => c.ticker)).toEqual(["VZ"]);
   });
   it("returns nothing for blank input", async () => {
     const { searchCompanies } = await load();

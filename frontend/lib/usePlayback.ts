@@ -10,7 +10,7 @@ const GAP_MS = 350; // silence between turns (target: under ~1.5 s)
  * Turns "lines received from the server" into "lines the audience has heard".
  * Plays one clip at a time, in order; a line's bubble appears when its clip starts.
  */
-export function usePlayback(lines: LineMessage[]) {
+export function usePlayback(lines: LineMessage[], onPlayed?: (turn: number) => void) {
   const [index, setIndex] = useState(-1); // line currently playing, or last one played
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0); // 0..1 through the current clip
@@ -18,6 +18,9 @@ export function usePlayback(lines: LineMessage[]) {
   const [muted, setMuted] = useState(false);
   const [blocked, setBlocked] = useState(false); // autoplay refused; needs a tap
   const handle = useRef<ClipHandle | null>(null);
+  // Latest callback without restarting clips when the parent re-renders.
+  const onPlayedRef = useRef(onPlayed);
+  onPlayedRef.current = onPlayed;
 
   const start = useCallback(
     (i: number) => {
@@ -30,6 +33,7 @@ export function usePlayback(lines: LineMessage[]) {
         onEnd: () => {
           setProgress(1);
           setPlaying(false);
+          onPlayedRef.current?.(line.turn); // tells the server where playback is (pacing)
         },
         onBlocked: () => {
           setBlocked(true);

@@ -29,17 +29,11 @@ describe("closedReason", () => {
 });
 
 describe("serverFinished", () => {
+  it("is false until the brief arrives, even when every planned line is in", () => {
+    // The backend keeps taking questions until the last line is heard (pacing), then sends the brief.
+    expect(serverFinished({ brief: false })).toBe(false);
+  });
   it("is true once the brief arrives", () => {
-    expect(serverFinished({ brief: true, lines: 0, maxTurns: null, thinking: false })).toBe(true);
-  });
-  it("is true when every planned line is in and nothing is being written", () => {
-    expect(serverFinished({ brief: false, lines: 9, maxTurns: 9, thinking: false })).toBe(true);
-  });
-  it("is false while a turn is still being written", () => {
-    expect(serverFinished({ brief: false, lines: 9, maxTurns: 9, thinking: true })).toBe(false);
-  });
-  it("is false before the plan is known or while lines are missing", () => {
-    expect(serverFinished({ brief: false, lines: 3, maxTurns: null, thinking: false })).toBe(false);
-    expect(serverFinished({ brief: false, lines: 3, maxTurns: 9, thinking: false })).toBe(false);
+    expect(serverFinished({ brief: true })).toBe(true);
   });
 });
