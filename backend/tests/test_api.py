@@ -32,6 +32,7 @@ def test_health(client, monkeypatch):
     body = client.get("/health").json()
     assert body["ok"] is True and body["gemini"]["key"] == "set" and body["storage"] == "memory"
     assert "secret-value" not in str(body)
+    assert body["fact_check_timeout"] == config.FACT_CHECK_TIMEOUT
 
 
 def test_health_shows_which_voice_settings_are_missing(client, monkeypatch):
