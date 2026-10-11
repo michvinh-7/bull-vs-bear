@@ -44,4 +44,8 @@ FACT_CHECK_TIMEOUT = float(_env("FACT_CHECK_TIMEOUT", "8"))
 PACING = _env("PACING", "true").lower() == "true"
 
 # Each user interrupt adds 3 lines (question + both sides); capped to protect voice credits.
+# A user's question is read aloud by the moderator (paid per character) and sent to Gemini.
+# Matches MAX_QUESTION_CHARS in frontend/lib/questions.ts; longer questions are cut off.
+MAX_QUESTION_CHARS = int(_env("MAX_QUESTION_CHARS", "280"))
+
 MAX_INTERRUPTS = int(_env("MAX_INTERRUPTS", "3"))

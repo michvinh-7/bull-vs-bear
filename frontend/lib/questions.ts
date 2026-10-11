@@ -1,5 +1,7 @@
 // Must match MAX_INTERRUPTS on the backend (backend/app/config.py).
 export const MAX_QUESTIONS = 3;
+// Must match MAX_QUESTION_CHARS on the backend. A question is read aloud and sent to Gemini.
+export const MAX_QUESTION_CHARS = 280;
 
 export interface QuestionState {
   replay: boolean; // streaming a finished debate from storage

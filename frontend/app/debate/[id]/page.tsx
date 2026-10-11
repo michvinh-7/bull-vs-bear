@@ -22,7 +22,7 @@ import { unlockAudio } from "@/lib/audio";
 import { isDemoId } from "@/lib/demo";
 import { getApiKey, getModel } from "@/lib/settings";
 import { findSource, formatMetric, metricsMentioned } from "@/lib/format";
-import { closedReason, MAX_QUESTIONS, serverFinished } from "@/lib/questions";
+import { closedReason, MAX_QUESTION_CHARS, MAX_QUESTIONS, serverFinished } from "@/lib/questions";
 import type { Label, Metric, Side } from "@/lib/types";
 import { useDebate } from "@/lib/useDebate";
 import { usePlayback } from "@/lib/usePlayback";
@@ -201,7 +201,7 @@ export default function DebateRoom() {
           )}
 
           <form
-            className="flex gap-2 border-t p-3"
+            className="flex flex-col gap-1.5 border-t p-3"
             onSubmit={(e) => {
               e.preventDefault();
               if (!question.trim() || reason) return;
@@ -209,17 +209,41 @@ export default function DebateRoom() {
               setQuestion("");
             }}
           >
-            <Button type="submit" className="rounded-full bg-unsupported text-background hover:bg-unsupported/90" disabled={!!reason}>
-              <Mic /> Interrupt
-            </Button>
-            <Input
-              autoComplete="off"
-              className="rounded-full"
-              placeholder={reason ?? `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              disabled={!!reason}
-            />
+            <div className="flex gap-2">
+              {/* Only sending is ever blocked; the text stays editable so nothing typed gets stuck. */}
+              <Button
+                type="submit"
+                className="rounded-full bg-unsupported text-background hover:bg-unsupported/90"
+                disabled={!!reason || !question.trim()}
+              >
+                <Mic /> Interrupt
+              </Button>
+              <div className="relative flex-1">
+                <Input
+                  autoComplete="off"
+                  className="rounded-full pr-16"
+                  placeholder={reason ? "Questions are closed" : `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
+                  value={question}
+                  maxLength={MAX_QUESTION_CHARS}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  aria-describedby="question-status"
+                />
+                {question && (
+                  <span
+                    className={`pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 font-mono text-[11px] ${
+                      question.length >= MAX_QUESTION_CHARS - 30 ? "text-contested" : "text-muted-foreground"
+                    }`}
+                  >
+                    {question.length}/{MAX_QUESTION_CHARS}
+                  </span>
+                )}
+              </div>
+            </div>
+            {reason && (
+              <p id="question-status" role="status" className="px-2 text-xs text-muted-foreground">
+                {reason}
+              </p>
+            )}
           </form>
         </Card>
 
