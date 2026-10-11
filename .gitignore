@@ -23,10 +23,12 @@ out/
 
 # Generated audio (lives in Supabase)
 *.mp3
+!frontend/public/demo/**/*.mp3
 
 # Next.js regenerates this on every dev/build
 next-env.d.ts
 .next-verify/
+.next-fallback/
 .vercel
 .env*
 

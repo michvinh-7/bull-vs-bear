@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getDebate, USE_MOCK, wsUrl } from "./api";
+import { isDemoId, loadDemo } from "./demo";
 import { mockDebate } from "./mock";
 import { mockModels, mockUsage } from "./mock/models";
 import { addToTotals, getModel } from "./settings";
-import type { CommitteeBrief, FactSheet, LineMessage, Positions, ServerMessage, Speaker, Usage } from "./types";
+import type { CommitteeBrief, Debate, FactSheet, LineMessage, Positions, ServerMessage, Speaker, Usage } from "./types";
 
 type Status = "connecting" | "live" | "done" | "error";
 
@@ -74,28 +75,52 @@ export function useDebate(debateId: string) {
   );
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("replay") === "1") setReplay(true);
+    // Recordings (demo-<TICKER>) are replays: nobody is there to answer questions.
+    if (isDemoId(debateId) || new URLSearchParams(window.location.search).get("replay") === "1") setReplay(true);
     else if (!USE_MOCK) getDebate(debateId).then((d) => setReplay(d.status === "done")).catch(() => {});
   }, [debateId]);
 
   useEffect(() => {
-    if (USE_MOCK) {
+    // Play a whole debate from data, message by message, as if it were streaming in.
+    const play = (m: Debate, usageAt: (lines: number, done?: boolean) => Usage | null) => {
       setStatus("live");
-      const m = mockDebate;
-      const model = getModel() ?? mockModels.default;
+      const usageMsg = (u: Usage | null): ServerMessage[] => (u ? [{ type: "usage", data: u }] : []);
       const queue: ServerMessage[] = [
         { type: "fact_sheet", data: m.fact_sheet! },
         { type: "positions", data: m.positions! },
-        { type: "usage", data: mockUsage(model, 0) },
+        ...usageMsg(usageAt(0)),
         ...m.lines.flatMap((data, i): ServerMessage[] => [
-          { type: "turn_start", turn: data.turn, speaker: data.speaker, max_turns: m.max_turns },
+          { type: "turn_start", turn: data.turn, speaker: data.speaker, max_turns: m.lines.length },
           { type: "line", data },
-          { type: "usage", data: mockUsage(model, i + 1) },
+          ...usageMsg(usageAt(i + 1)),
         ]),
-        { type: "usage", data: mockUsage(model, m.lines.length, true) },
+        ...usageMsg(usageAt(m.lines.length, true)),
         { type: "brief", data: m.brief! },
       ];
-      const timers = queue.map((msg, i) => setTimeout(() => handle(msg), i * 900));
+      return queue.map((msg, i) => setTimeout(() => handle(msg), i * 900));
+    };
+
+    // Stage fallback: a recorded real debate, served by the frontend itself (no backend).
+    if (isDemoId(debateId)) {
+      let timers: ReturnType<typeof setTimeout>[] = [];
+      let cancelled = false;
+      loadDemo(debateId)
+        .then((d) => {
+          if (!cancelled) timers = play(d, (_, done) => (done ? (d.usage ?? null) : null));
+        })
+        .catch((e) => {
+          setError(e.message);
+          setStatus("error");
+        });
+      return () => {
+        cancelled = true;
+        timers.forEach(clearTimeout);
+      };
+    }
+
+    if (USE_MOCK) {
+      const model = getModel() ?? mockModels.default;
+      const timers = play(mockDebate, (n, done) => mockUsage(model, n, done));
       return () => timers.forEach(clearTimeout);
     }
 
