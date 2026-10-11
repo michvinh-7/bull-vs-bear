@@ -8,7 +8,10 @@
     "start": "next start",
     "sync-shapes": "cp ../shared/examples/*.json lib/mock/",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:save": "node scripts/save-demo.mjs",
+    "fallback:build": "NEXT_DIST_DIR=.next-fallback NEXT_PUBLIC_USE_MOCK=true next build",
+    "fallback:start": "NEXT_DIST_DIR=.next-fallback next start -p 3001"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

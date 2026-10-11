@@ -1,6 +1,7 @@
 import type { CommitteeBrief, Debate, ModelsResponse } from "./types";
 import { mockDebate } from "./mock";
 import { mockModels } from "./mock/models";
+import { demoId, demoRecordings, isDemoId, loadDemo } from "./demo";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
@@ -24,7 +25,11 @@ export interface StartOptions {
 }
 
 export async function startDebate(ticker: string, opts: StartOptions = {}): Promise<string> {
-  if (USE_MOCK) return "mock";
+  if (USE_MOCK) {
+    // Mock mode plays a real recorded debate when there is one, else the Northwind sample.
+    const recorded = (await demoRecordings()).some((r) => r.ticker === ticker.trim().toUpperCase());
+    return recorded ? demoId(ticker.trim()) : "mock";
+  }
   const res = await fetch(`${API_URL}/debates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -46,6 +51,7 @@ export async function getModels(): Promise<ModelsResponse> {
 }
 
 export async function getDebate(id: string): Promise<Debate> {
+  if (isDemoId(id)) return loadDemo(id); // recordings never need the backend
   if (USE_MOCK) return mockDebate;
   const res = await fetch(`${API_URL}/debates/${id}`);
   if (!res.ok) throw await errorFrom(res, "Debate not found");

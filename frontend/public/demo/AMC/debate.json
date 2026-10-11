@@ -1,0 +1,503 @@
+{
+  "id": "demo-AMC",
+  "ticker": "AMC",
+  "status": "done",
+  "max_turns": 8,
+  "model": "gemini-3.5-flash",
+  "usage": {
+    "model": "gemini-3.5-flash",
+    "calls": 15,
+    "input_tokens": 57605,
+    "output_tokens": 4192,
+    "thinking_tokens": 1323,
+    "voice_chars": 2576,
+    "cost_usd": 0.06388500000000001
+  },
+  "fact_sheet": {
+    "company": "AMC Entertainment Holdings, Inc.",
+    "ticker": "AMC",
+    "as_of": "FY2025",
+    "sources": [
+      {
+        "id": "S1",
+        "kind": "10-K",
+        "label": "10-K · p. 68",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "A 100-basis point change in market interest rates would have increased or decreased interest expense on the New Term Loans by approximately $20.1 million during the year ended December 31, 2025."
+      },
+      {
+        "id": "S2",
+        "kind": "10-K",
+        "label": "10-K · Financial statements",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "For the fiscal year ended December 31, 2025, the company reported net loss of $632.4 million; operating loss of $17.4 million; depreciation and amortization of $313.4 million; interest expense of $459.5 million; total debt of $4 billion; cash and cash equivalents of $428.5 million. Debt principal comes due as follows: $19.9 million in 2026, $545.2 million in 2027, $19.5 million in 2028, $3.2 billion in 2029, $267.4 million in 2030."
+      },
+      {
+        "id": "S3",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "Credit Agreement-Term Loans due 2029 (10.731% as of December 31, 2025 and 11.356% as of December 31, 2024) | $ | 1,994.2 | $ | 2,014.2"
+      },
+      {
+        "id": "S4",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "Senior Secured Notes due 2029 (9.0% cash interest & 6.0% PIK interest as of December 31, 2025) | 877.1 | —"
+      },
+      {
+        "id": "S5",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "12.75% Odeon Senior Secured Notes due 2027 | 400.0 | 400.0"
+      },
+      {
+        "id": "S6",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "7.5% First Lien Notes due 2029 | 360.0 | 950.0"
+      },
+      {
+        "id": "S7",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "Senior Secured Exchangeable Notes due 2030 (1.5% cash interest) | 155.8 | —"
+      },
+      {
+        "id": "S8",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "6.125% Senior Subordinated Notes due 2027 | 125.5 | 125.5"
+      },
+      {
+        "id": "S9",
+        "kind": "10-K",
+        "label": "10-K · p. 98",
+        "url": "https://www.sec.gov/Archives/edgar/data/1411579/000141157926000016/amc-20251231x10k.htm",
+        "excerpt": "6.00%/8.00% Cash/PIK Toggle Senior Secured Exchangeable Notes due 2030 | 111.6 | 427.6"
+      },
+      {
+        "id": "N1",
+        "kind": "news",
+        "label": "News · moodys.com · 2026-05-01",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGvxbCtbzz1PpCdT-MPv7AAB4ydrf_Ch3HDu6MXOT3leV1OLT5UOplA2c2cPEjyvrGLwElYG1SeaYgz0HIfwmg1prDAh0aStLWbDVm36gUfuz7x1tuMuaw0r2cONhXkMmpwHjzhYKSsJTw5nInHdb_OTpfMDocsCjQSmw==",
+        "excerpt": "May 1, 2026: Moody's Ratings assigned a B3 rating to a new senior secured term loan facility at AMC Entertainment Holdings, Inc.'s subsidiary Odeon, with a stable outlook."
+      },
+      {
+        "id": "N2",
+        "kind": "news",
+        "label": "News · amctheatres.com · 2026-07-20",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHByJdRaPiSLUz5ekUN086wbUYNC7et6nbdTbPGv4WFDHvEPRtj7QWTxpA-idFQjaIHV_gUxVP8qeEOGcrIJ8ZqXs__dlHpCx91xuvBvkzfDa3HxnydI46hZrWN6cn9gjK6zxi0d_p4sw7sVfG81vWjhWeFdZ3H0dM4Qp1JhTLyxQYlT4onV9OLv79vi9fhELqteenW-p-yBVf7Pahxeb2W6MgUdgIcrg==",
+        "excerpt": "July 20, 2026: AMC Entertainment Holdings, Inc. reported second-quarter 2026 financial results, generating $1,596.7 million in total revenues, $321.4 million in adjusted EBITDA, and a net loss of $11.4 million."
+      },
+      {
+        "id": "N3",
+        "kind": "news",
+        "label": "News · spglobal.com · 2026-07-28",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHKBi6h2RwENtSpIDP1YORentanMHDpE0TgeB-R6hHvhK0EmO-TU4bNqeJ-ZkUsnVlsz8Q_lKC_p3f_mqSnMQDeBbcx5hoGAKZ-qZPcyUud5IWyqPXC1rxalotxSAmfZl1pRxDNUtXD0qSG8bC8_4zhCHGkJYIj5Kb4OM7gySq5dMiHh2Zovw==",
+        "excerpt": "July 28, 2026: S&P Global Ratings raised AMC Entertainment Holdings, Inc.'s issuer credit rating to 'B-' from 'CCC+' and upgraded its issue-level rating on the company's $2.0 billion first-lien term loan to 'B+' from 'B'."
+      },
+      {
+        "id": "N4",
+        "kind": "news",
+        "label": "News · moodys.com · 2026-09-21",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGvxbCtbzz1PpCdT-MPv7AAB4ydrf_Ch3HDu6MXOT3leV1OLT5UOplA2c2cPEjyvrGLwElYG1SeaYgz0HIfwmg1prDAh0aStLWbDVm36gUfuz7x1tuMuaw0r2cONhXkMmpwHjzhYKSsJTw5nInHdb_OTpfMDocsCjQSmw==",
+        "excerpt": "September 21, 2026: Moody's Ratings upgraded AMC Entertainment Holdings, Inc.'s corporate family rating to B3 with a positive outlook and assigned a B1 rating to the company's new first-lien term loan and notes."
+      }
+    ],
+    "metrics": [
+      {
+        "name": "leverage",
+        "label": "Debt-to-EBITDA",
+        "value": 13.6,
+        "unit": "x",
+        "formula": "$4 billion debt / $296 million EBITDA",
+        "source_ids": [
+          "S2"
+        ]
+      },
+      {
+        "name": "interest_coverage",
+        "label": "Interest coverage",
+        "value": 0.64,
+        "unit": "x",
+        "formula": "$296 million EBITDA / $459.5 million interest",
+        "source_ids": [
+          "S2"
+        ]
+      },
+      {
+        "name": "floating_rate_pct",
+        "label": "Floating-rate debt",
+        "value": 49.9,
+        "unit": "pct",
+        "formula": "$2 billion floating / $4 billion debt",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "name": "next_maturity_year",
+        "label": "Next big maturity",
+        "value": 2027,
+        "unit": "year",
+        "formula": "$545.2 million due in 2027 of $4 billion total debt",
+        "source_ids": [
+          "S2"
+        ]
+      },
+      {
+        "name": "liquidity_usd",
+        "label": "Total immediate liquidity",
+        "value": 428500000,
+        "unit": "usd",
+        "formula": "$428.5 million cash, no undrawn revolver reported",
+        "source_ids": [
+          "S2"
+        ]
+      }
+    ],
+    "debt": [
+      {
+        "name": "Credit Agreement-Term Loans due 2029",
+        "amount_usd": 1994200000,
+        "seniority": "senior_secured",
+        "rate_type": "floating",
+        "rate": "10.731%",
+        "maturity_year": 2029,
+        "source_id": "S3"
+      },
+      {
+        "name": "Senior Secured Notes due 2029",
+        "amount_usd": 877100000,
+        "seniority": "senior_secured",
+        "rate_type": "fixed",
+        "rate": "9.0% cash interest & 6.0% PIK interest",
+        "maturity_year": 2029,
+        "source_id": "S4"
+      },
+      {
+        "name": "12.75% Odeon Senior Secured Notes due 2027",
+        "amount_usd": 400000000,
+        "seniority": "senior_secured",
+        "rate_type": "fixed",
+        "rate": "12.75%",
+        "maturity_year": 2027,
+        "source_id": "S5"
+      },
+      {
+        "name": "7.5% First Lien Notes due 2029",
+        "amount_usd": 360000000,
+        "seniority": "senior_secured",
+        "rate_type": "fixed",
+        "rate": "7.5%",
+        "maturity_year": 2029,
+        "source_id": "S6"
+      },
+      {
+        "name": "Senior Secured Exchangeable Notes due 2030",
+        "amount_usd": 155800000,
+        "seniority": "senior_secured",
+        "rate_type": "fixed",
+        "rate": "1.5%",
+        "maturity_year": 2030,
+        "source_id": "S7"
+      },
+      {
+        "name": "6.125% Senior Subordinated Notes due 2027",
+        "amount_usd": 125500000,
+        "seniority": "subordinated",
+        "rate_type": "fixed",
+        "rate": "6.125%",
+        "maturity_year": 2027,
+        "source_id": "S8"
+      },
+      {
+        "name": "6.00%/8.00% Cash/PIK Toggle Senior Secured Exchangeable Notes due 2030",
+        "amount_usd": 111600000,
+        "seniority": "senior_secured",
+        "rate_type": "fixed",
+        "rate": "6.00%/8.00%",
+        "maturity_year": 2030,
+        "source_id": "S9"
+      }
+    ],
+    "notices": []
+  },
+  "positions": {
+    "bull": {
+      "thesis": "AMC Entertainment Holdings, Inc. demonstrates manageable near-term maturities and improving credit momentum supported by recent rating upgrades. The company maintains adequate liquidity to bridge operations as financial performance recovers.",
+      "points": [
+        {
+          "text": "S&P upgraded issuer credit rating to B- from CCC+",
+          "source_id": "N3"
+        },
+        {
+          "text": "Generated $321.4 million in adjusted EBITDA during Q2 2026",
+          "source_id": "N2"
+        },
+        {
+          "text": "Manageable debt principal due of $19.9 million in 2026",
+          "source_id": "S2"
+        }
+      ]
+    },
+    "bear": {
+      "thesis": "The company remains burdened by high leverage and weak interest coverage, leaving it vulnerable to persistent net losses. Massive debt maturities looming in 2029 pose significant refinancing risks.",
+      "points": [
+        {
+          "text": "High Debt-to-EBITDA leverage standing at 13.6x",
+          "source_id": "S2"
+        },
+        {
+          "text": "Weak interest coverage ratio of 0.64x",
+          "source_id": "S2"
+        },
+        {
+          "text": "Substantial debt principal coming due of $3.2 billion in 2029",
+          "source_id": "S2"
+        }
+      ]
+    }
+  },
+  "lines": [
+    {
+      "turn": 1,
+      "speaker": "bull",
+      "from_user": false,
+      "text": "AMC's core operating momentum is turning the corner quickly. The company generated $1,596.7 million in total revenues and $321.4 million in adjusted EBITDA in the second quarter of 2026. Credit rating agencies are taking notice, with Moody's upgrading the corporate family rating to B3 with a positive outlook.",
+      "claims": [
+        {
+          "id": "t1c1",
+          "text": "AMC reported $1,596.7 million in total revenues and $321.4 million in adjusted EBITDA for the second quarter of 2026.",
+          "source_id": "N2",
+          "label": "verified"
+        },
+        {
+          "id": "t1c2",
+          "text": "Moody's upgraded AMC's corporate family rating to B3 with a positive outlook in September 2026.",
+          "source_id": "N4",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/AMC/01-bull.mp3"
+    },
+    {
+      "turn": 2,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "A single quarter of $321.4 million in adjusted EBITDA does not fix a broken balance sheet. For full year 2025, AMC suffered a net loss of $632.4 million while carrying a massive total debt load of $4 billion. Lenders face a crushing wall of debt coming due, including $3.2 billion in 2029.",
+      "claims": [
+        {
+          "id": "t2c1",
+          "text": "AMC reported a net loss of $632.4 million for the fiscal year ended December 31, 2025.",
+          "source_id": "S2",
+          "label": "verified"
+        },
+        {
+          "id": "t2c2",
+          "text": "AMC ended 2025 with $4 billion in total debt.",
+          "source_id": "S2",
+          "label": "verified"
+        },
+        {
+          "id": "t2c3",
+          "text": "AMC faces $3.2 billion in debt principal maturities in 2029.",
+          "source_id": "S2",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/AMC/02-bear.mp3"
+    },
+    {
+      "turn": 3,
+      "speaker": "bull",
+      "from_user": false,
+      "text": "That $632.4 million net loss from 2025 is backward-looking and includes $313.4 million in non-cash depreciation and amortization. Meanwhile, S&P Global Ratings raised AMC's credit rating to B- from CCC+ in July 2026. The company also holds $428.5 million in cash and cash equivalents, giving it plenty of breathing room.",
+      "claims": [
+        {
+          "id": "t3c1",
+          "text": "AMC reported depreciation and amortization of $313.4 million for the fiscal year ended December 31, 2025.",
+          "source_id": "S2",
+          "label": "verified"
+        },
+        {
+          "id": "t3c2",
+          "text": "S&P Global Ratings raised AMC's issuer credit rating to B- from CCC+ in July 2026.",
+          "source_id": "N3",
+          "label": "verified"
+        },
+        {
+          "id": "t3c3",
+          "text": "AMC held cash and cash equivalents of $428.5 million as of December 31, 2025.",
+          "source_id": "S2",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/AMC/03-bull.mp3"
+    },
+    {
+      "turn": 4,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "Even excluding $313.4 million in depreciation and amortization, cash flow falls dangerously short. Interest coverage sits at a razor-thin 0.64x, meaning operational earnings cannot even cover annual interest expense of $459.5 million. Furthermore, floating-rate debt accounts for 49.9% of the total load, leaving lenders exposed to rising interest costs.",
+      "claims": [
+        {
+          "id": "t4c1",
+          "text": "AMC's interest coverage ratio was 0.64x.",
+          "source_id": "S2",
+          "label": "verified"
+        },
+        {
+          "id": "t4c2",
+          "text": "AMC reported interest expense of $459.5 million for the fiscal year ended December 31, 2025.",
+          "source_id": "S2",
+          "label": "verified"
+        },
+        {
+          "id": "t4c3",
+          "text": "Floating-rate debt comprises 49.9% of AMC's total debt.",
+          "source_id": "S1",
+          "label": "unsupported"
+        }
+      ],
+      "audio_url": "/demo/AMC/04-bear.mp3"
+    },
+    {
+      "turn": 5,
+      "speaker": "moderator",
+      "from_user": false,
+      "text": "Bear, you pointed out that floating-rate debt comprises 49.9% of total debt, but this claim was flagged as unsupported. How do you reconcile that figure given annual interest expense of $459.5 million against $4 billion in total debt?",
+      "claims": [],
+      "audio_url": "/demo/AMC/05-moderator.mp3"
+    },
+    {
+      "turn": 6,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "The 49.9% floating-rate debt figure directly stems from the nearly $2 billion term loan due 2029 carrying a floating 10.731% rate out of $4 billion in total debt. This heavy floating exposure is a primary driver behind the massive $459.5 million in annual interest expense. In fact, a simple 100-basis point rate increase adds approximately $20.1 million to annual interest expense on those term loans.",
+      "claims": [
+        {
+          "id": "t6c1",
+          "text": "AMC held $1,994.2 million in term loans due 2029 with a floating interest rate of 10.731% as of December 31, 2025.",
+          "source_id": "S3",
+          "label": "verified"
+        },
+        {
+          "id": "t6c2",
+          "text": "A 100-basis point change in market interest rates would change annual interest expense on AMC's term loans by approximately $20.1 million.",
+          "source_id": "S1",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/AMC/06-bear.mp3"
+    },
+    {
+      "turn": 7,
+      "speaker": "bull",
+      "from_user": false,
+      "text": "While AMC carried $1,994.2 million in floating term loans in 2025, major rating agencies are actively rewarding its credit profile improvement. In September 2026, Moody's assigned a B1 rating to AMC's new first-lien term loan and notes. S&P Global Ratings also upgraded its rating on the $2.0 billion first-lien term loan to B+ from B.",
+      "claims": [
+        {
+          "id": "t7c1",
+          "text": "AMC held $1,994.2 million in term loans due 2029 as of December 31, 2025.",
+          "source_id": "S3",
+          "label": "verified"
+        },
+        {
+          "id": "t7c2",
+          "text": "Moody's assigned a B1 rating to AMC's new first-lien term loan and notes in September 2026.",
+          "source_id": "N4",
+          "label": "verified"
+        },
+        {
+          "id": "t7c3",
+          "text": "S&P Global Ratings upgraded its issue-level rating on AMC's $2.0 billion first-lien term loan to B+ from B in July 2026.",
+          "source_id": "N3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/AMC/07-bull.mp3"
+    },
+    {
+      "turn": 8,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "Holding $1,994.2 million in term loans due 2029 is a liability, not a comfort, especially with leverage at a sky-high 13.6x Debt-to-EBITDA. The company faces a major maturity wall long before 2029, with $545.2 million due in 2027 alone. Lenders should be deeply concerned about refinancing risks when leverage is this elevated.",
+      "claims": [
+        {
+          "id": "t8c1",
+          "text": "AMC's Debt-to-EBITDA stands at 13.6x.",
+          "source_id": "S2",
+          "label": "verified"
+        },
+        {
+          "id": "t8c2",
+          "text": "AMC faces $545.2 million of debt principal coming due in 2027.",
+          "source_id": "S2",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/AMC/08-bear.mp3"
+    }
+  ],
+  "brief": {
+    "agreed": [
+      {
+        "text": "AMC ended 2025 with $4 billion in total debt and held $428.5 million in cash and cash equivalents.",
+        "claim_ids": [
+          "t2c2",
+          "t3c3"
+        ]
+      }
+    ],
+    "disputed": [
+      {
+        "topic": "Financial performance and balance sheet health",
+        "bull": "AMC showed strong momentum in Q2 2026 with $321.4 million in adjusted EBITDA while holding $428.5 million in cash.",
+        "bear": "AMC suffered a net loss of $632.4 million in 2025 while interest coverage sits at a weak 0.64x.",
+        "claim_ids": [
+          "t1c1",
+          "t3c3",
+          "t2c1",
+          "t4c1"
+        ]
+      },
+      {
+        "topic": "Credit rating trajectory and debt obligations",
+        "bull": "Rating agencies recognized credit improvements as S&P Global Ratings raised AMC's credit rating to B- and Moody's assigned B1 to new notes.",
+        "bear": "High leverage persists with Debt-to-EBITDA at 13.6x alongside $545.2 million of principal coming due in 2027.",
+        "claim_ids": [
+          "t3c2",
+          "t7c2",
+          "t8c1",
+          "t8c2"
+        ]
+      }
+    ],
+    "unsupported": [
+      {
+        "claim_id": "t4c3",
+        "speaker": "bear",
+        "text": "Floating-rate debt comprises 49.9% of AMC's total debt."
+      }
+    ],
+    "open_questions": [
+      {
+        "question": "Will operating earnings be sufficient to cover the $545.2 million debt principal coming due in 2027?",
+        "where_to_look": "10-K · Financial statements"
+      },
+      {
+        "question": "How will market interest rate fluctuations affect interest expense given the $20.1 million impact per 100-basis point change?",
+        "where_to_look": "10-K · p. 68"
+      }
+    ]
+  },
+  "recorded_from": "bb1a1f4abade"
+}

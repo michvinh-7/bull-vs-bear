@@ -1,0 +1,508 @@
+{
+  "id": "demo-VZ",
+  "ticker": "VZ",
+  "status": "done",
+  "max_turns": 8,
+  "model": "gemini-3.5-flash",
+  "usage": {
+    "model": "gemini-3.5-flash",
+    "calls": 16,
+    "input_tokens": 65055,
+    "output_tokens": 3829,
+    "thinking_tokens": 0,
+    "voice_chars": 2279,
+    "cost_usd": 0.06315
+  },
+  "fact_sheet": {
+    "company": "Verizon Communications Inc.",
+    "ticker": "VZ",
+    "as_of": "FY2025",
+    "sources": [
+      {
+        "id": "S1",
+        "kind": "10-K",
+        "label": "10-K · p. 16",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "As of December 31, 2025, Verizon had approximately $131.1 billion of outstanding unsecured indebtedness, $12.0 billion of unused borrowing capacity under our existing revolving credit facility and $27.1 billion of outstanding secured indebtedness."
+      },
+      {
+        "id": "S2",
+        "kind": "10-K",
+        "label": "10-K · p. 47",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "As of December 31, 2025, approximately 79% of the aggregate principal amount of our total debt portfolio consisted of fixed-rate indebtedness, including the effect of interest rate swap agreements designated as hedges."
+      },
+      {
+        "id": "S3",
+        "kind": "10-K",
+        "label": "10-K · Financial statements",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "For the fiscal year ended December 31, 2025, the company reported net income of $17.2 billion; operating income of $29.3 billion; depreciation and amortization of $18.3 billion; interest expense of $6.7 billion; total debt of $158.2 billion; cash and cash equivalents of $19 billion. Debt principal comes due as follows: $17.3 billion in 2026, $9.6 billion in 2027, $13 billion in 2028, $8.1 billion in 2029, $11.1 billion in 2030, $96.8 billion after 2030."
+      },
+      {
+        "id": "S4",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 5.875% notes due 2055(3) | 3,250 | 2,817"
+      },
+      {
+        "id": "S5",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 3.996% junior subordinated notes due 2056(2) | 2,250 | 2,573"
+      },
+      {
+        "id": "S6",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 5.250% notes due 2035(3) | $ | 2,250 | 1,676"
+      },
+      {
+        "id": "S7",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 5.000% notes due 2036 | 2,250 | 2,222"
+      },
+      {
+        "id": "S8",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 4.750% notes due 2033 | 2,000 | 1,987"
+      },
+      {
+        "id": "S9",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 6.000% notes due 2065(3) | 2,000 | 1,687"
+      },
+      {
+        "id": "S10",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 5.750% notes due 2045 | 1,500 | 1,485"
+      },
+      {
+        "id": "S11",
+        "kind": "10-K",
+        "label": "10-K · p. 75",
+        "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000007/vz-20251231.htm",
+        "excerpt": "Verizon 5.742% junior subordinated notes due 2056(2) | £ | 1,000 | 1,298"
+      },
+      {
+        "id": "N1",
+        "kind": "news",
+        "label": "News · verizon.com · 2026-04-27",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG5tJvkqFwtiUgd9X9rX80I5RDh5rMdacMsOZL4zNa62UqeRtLceaC2j3WjGYc-So6_Ypp2ZoYQQcVUsxFsSIM4g2WAaZSz1Ur_M0AHQ1OM09HoiN1t-gku-kJSLqSNHe913i-FpOgIZ-xHoBrSFIqHSg7_v8dbi2AI1TiaK24n-hKOxK-UBMwp_dCtDPkkGthunetu6vrtH4GvhyTDRK8Pck0JVoVuLN48_bnZ_KlZau-v8mdy3CM=",
+        "excerpt": "April 27, 2026: Verizon Communications Inc. reported its first-quarter 2026 financial results and raised its full-year 2026 adjusted EPS guidance to year-over-year growth of 5.0 to 6.0 percent."
+      },
+      {
+        "id": "N2",
+        "kind": "news",
+        "label": "News · fierce-network.com · 2026-07-16",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEC1q-yDTTOQcArmlHk6bFrP6S9PkGwaMZPkojWLQ7ufuxngzIVSh_BwDqdGf5kUHzJ-jAm6zcsEBzsknVkRMmIA38G0-BSY_1eUjbaydDv_V7dAV7of8D0BiaxEq9M9v_e5D--p9nPJxFc4WLkckrsnCCqwnomBQOkfwx0xOTLG37yEh-pYIJY82xk",
+        "excerpt": "July 16, 2026: Verizon Communications Inc. announced plans to sell 274 company-owned retail stores to authorized retailers and eliminate approximately 500 corporate jobs, impacting roughly 3,000 employees in total."
+      },
+      {
+        "id": "N3",
+        "kind": "news",
+        "label": "News · verizon.com · 2026-07-24",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE4dhXpd2yghYGq_zaHhNobLQiOxe779-vKSouK6iOLIJLc1vJ6eaJ3BIebOrynHA1f8M_0A10FvN-_gzcwaXD0Q73cg25Us1qxaYrv6jplJuKYWT2qWpenxND8AaQefh2nbonB8wcAi-TAJYroXz74YZ-2kN8Ti19bnyHOACaQ18DptdXhQEwH6xwp0YGIoH-q",
+        "excerpt": "July 24, 2026: Verizon Communications Inc. reported second-quarter 2026 financial results, generating consolidated net income of $3.95 billion, a record adjusted EBITDA of $13.72 billion with a 40.1 percent margin, and free cash flow of $6.43 billion."
+      },
+      {
+        "id": "N4",
+        "kind": "news",
+        "label": "News · verizon.com · 2026-07-24",
+        "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGCdo-nqL_GD0hiic3lvUDGEgqNRjwKPHVHYUAverOiO9LIhbDhHOM2K3nPNMy8-QVzR4xWDfsetsTLUZtBtPBe8ojloruTlzNkrOhHopATtSy9wrn1QJAz1Q6uVEk2CMlDLHbYIJTy2-4-2W4KISG5_SDdULDyImGWegao0Lw5uX1D8sd0i1irppHNXSMD",
+        "excerpt": "July 24, 2026: Verizon Communications Inc. raised its full-year 2026 guidance to project mobility and broadband service revenue growth of 2.5 to 3.0 percent, adjusted EPS growth of 6 to 7 percent, and free cash flow growth of 9 to 10 percent, while increasing its full-year share repurchase target to up to $4.5 billion."
+      }
+    ],
+    "metrics": [
+      {
+        "name": "leverage",
+        "label": "Debt-to-EBITDA",
+        "value": 3.32,
+        "unit": "x",
+        "formula": "$158.2 billion debt / $47.6 billion EBITDA",
+        "source_ids": [
+          "S3"
+        ]
+      },
+      {
+        "name": "interest_coverage",
+        "label": "Interest coverage",
+        "value": 7.11,
+        "unit": "x",
+        "formula": "$47.6 billion EBITDA / $6.7 billion interest",
+        "source_ids": [
+          "S3"
+        ]
+      },
+      {
+        "name": "floating_rate_pct",
+        "label": "Floating-rate debt",
+        "value": 21,
+        "unit": "pct",
+        "formula": "$33.2 billion floating / $158.2 billion debt",
+        "source_ids": [
+          "S2",
+          "S3"
+        ]
+      },
+      {
+        "name": "next_maturity_year",
+        "label": "Next big maturity",
+        "value": 2026,
+        "unit": "year",
+        "formula": "$17.3 billion due in 2026 of $158.2 billion total debt",
+        "source_ids": [
+          "S3"
+        ]
+      },
+      {
+        "name": "liquidity_usd",
+        "label": "Total immediate liquidity",
+        "value": 31048000000,
+        "unit": "usd",
+        "formula": "$19 billion cash + $12 billion undrawn revolver",
+        "source_ids": [
+          "S1",
+          "S3"
+        ]
+      }
+    ],
+    "debt": [
+      {
+        "name": "Verizon 5.875% notes due 2055",
+        "amount_usd": 3250000000,
+        "seniority": "senior_unsecured",
+        "rate_type": "fixed",
+        "rate": "5.875%",
+        "maturity_year": 2055,
+        "source_id": "S4"
+      },
+      {
+        "name": "Verizon 3.996% junior subordinated notes due 2056",
+        "amount_usd": 2250000000,
+        "seniority": "subordinated",
+        "rate_type": "fixed",
+        "rate": "3.996%",
+        "maturity_year": 2056,
+        "source_id": "S5"
+      },
+      {
+        "name": "Verizon 5.250% notes due 2035",
+        "amount_usd": 2250000000,
+        "seniority": "senior_unsecured",
+        "rate_type": "fixed",
+        "rate": "5.250%",
+        "maturity_year": 2035,
+        "source_id": "S6"
+      },
+      {
+        "name": "Verizon 5.000% notes due 2036",
+        "amount_usd": 2250000000,
+        "seniority": "senior_unsecured",
+        "rate_type": "fixed",
+        "rate": "5.000%",
+        "maturity_year": 2036,
+        "source_id": "S7"
+      },
+      {
+        "name": "Verizon 4.750% notes due 2033",
+        "amount_usd": 2000000000,
+        "seniority": "senior_unsecured",
+        "rate_type": "fixed",
+        "rate": "4.750%",
+        "maturity_year": 2033,
+        "source_id": "S8"
+      },
+      {
+        "name": "Verizon 6.000% notes due 2065",
+        "amount_usd": 2000000000,
+        "seniority": "senior_unsecured",
+        "rate_type": "fixed",
+        "rate": "6.000%",
+        "maturity_year": 2065,
+        "source_id": "S9"
+      },
+      {
+        "name": "Verizon 5.750% notes due 2045",
+        "amount_usd": 1500000000,
+        "seniority": "senior_unsecured",
+        "rate_type": "fixed",
+        "rate": "5.750%",
+        "maturity_year": 2045,
+        "source_id": "S10"
+      },
+      {
+        "name": "Verizon 5.742% junior subordinated notes due 2056",
+        "amount_usd": 1000000000,
+        "seniority": "subordinated",
+        "rate_type": "fixed",
+        "rate": "5.742%",
+        "maturity_year": 2056,
+        "source_id": "S11"
+      }
+    ],
+    "notices": []
+  },
+  "positions": {
+    "bull": {
+      "thesis": "Verizon maintains a stable credit profile backed by solid operating profitability, strong interest coverage, and substantial cash generation. Its strong liquidity buffers and largely fixed-rate debt structure provide reliable protection for debt holders.",
+      "points": [
+        {
+          "text": "Solid interest coverage of 7.11x supported by strong underlying earnings.",
+          "source_id": "S3"
+        },
+        {
+          "text": "High fixed-rate debt portfolio composition at 79% protects cash flows.",
+          "source_id": "S2"
+        },
+        {
+          "text": "Robust Q2 2026 results generated free cash flow of $6.43 billion.",
+          "source_id": "N3"
+        }
+      ]
+    },
+    "bear": {
+      "thesis": "Verizon carries a significant total debt burden with heavy near-term maturities that present ongoing refinancing risks. High balance sheet leverage limits financial flexibility alongside ongoing corporate restructuring.",
+      "points": [
+        {
+          "text": "Substantial total debt burden standing at $158.2 billion in 2025.",
+          "source_id": "S3"
+        },
+        {
+          "text": "Heavy near-term maturities with $17.3 billion coming due in 2026.",
+          "source_id": "S3"
+        },
+        {
+          "text": "Cost cutting involved eliminating approximately 500 corporate jobs and store sales.",
+          "source_id": "N2"
+        }
+      ]
+    }
+  },
+  "lines": [
+    {
+      "turn": 1,
+      "speaker": "bull",
+      "from_user": false,
+      "text": "Verizon's core cash flow engine is firing on all cylinders to support its balance sheet. For the second quarter of 2026, the company generated $6.43 billion of free cash flow and a record adjusted EBITDA of $13.72 billion with a 40.1 percent margin.",
+      "claims": [
+        {
+          "id": "t1c1",
+          "text": "Verizon generated $6.43 billion of free cash flow in the second quarter of 2026.",
+          "source_id": "N3",
+          "label": "verified"
+        },
+        {
+          "id": "t1c2",
+          "text": "Verizon generated record adjusted EBITDA of $13.72 billion with a 40.1 percent margin in the second quarter of 2026.",
+          "source_id": "N3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/01-bull.mp3"
+    },
+    {
+      "turn": 2,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "Quarterly free cash flow of $6.43 billion looks good, but it is heavily burdened by a massive total debt load of $158.2 billion. Lenders face serious refinancing risks as $17.3 billion in debt principal comes due in 2026 alone.",
+      "claims": [
+        {
+          "id": "t2c1",
+          "text": "Verizon has total debt of $158.2 billion.",
+          "source_id": "S3",
+          "label": "verified"
+        },
+        {
+          "id": "t2c2",
+          "text": "Verizon has $17.3 billion of debt principal coming due in 2026.",
+          "source_id": "S3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/02-bear.mp3"
+    },
+    {
+      "turn": 3,
+      "speaker": "bull",
+      "from_user": false,
+      "text": "While total debt of $158.2 billion is substantial, Verizon holds $31 billion in total immediate liquidity to handle near-term obligations comfortably. Furthermore, the company reported solid annual net income of $17.2 billion to back that debt load.",
+      "claims": [
+        {
+          "id": "t3c1",
+          "text": "Verizon has $31 billion in total immediate liquidity.",
+          "source_id": "S1",
+          "label": "verified"
+        },
+        {
+          "id": "t3c2",
+          "text": "Verizon reported net income of $17.2 billion for the fiscal year ended December 31, 2025.",
+          "source_id": "S3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/03-bull.mp3"
+    },
+    {
+      "turn": 4,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "That $31 billion in total immediate liquidity looks much thinner when you realize Verizon faces a heavy wall of maturities right after 2026. The company must address $9.6 billion in 2027 and $13 billion in 2028. Managing those debt roll-overs in a higher-rate environment will continuously drain that cash cushion.",
+      "claims": [
+        {
+          "id": "t4c1",
+          "text": "Verizon faces debt maturities of $9.6 billion in 2027.",
+          "source_id": "S3",
+          "label": "verified"
+        },
+        {
+          "id": "t4c2",
+          "text": "Verizon has $13 billion of debt principal coming due in 2028.",
+          "source_id": "S3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/04-bear.mp3"
+    },
+    {
+      "turn": 5,
+      "speaker": "moderator",
+      "from_user": false,
+      "text": "Bear, you highlighted upcoming maturities like $17.3 billion in 2026 and $9.6 billion in 2027. How does that wall of refinancing offset Verizon's $31 billion in total immediate liquidity and $6.43 billion in quarterly free cash flow?",
+      "claims": [],
+      "audio_url": "/demo/VZ/05-moderator.mp3"
+    },
+    {
+      "turn": 6,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "The $31 billion in total immediate liquidity and $6.43 billion in quarterly free cash flow are quickly depleted when you look past 2026. Verizon still faces $8.1 billion coming due in 2029 and $11.1 billion in 2030, alongside an enormous $96.8 billion due after 2030. Constantly refinancing those massive sums will keep interest costs high.",
+      "claims": [
+        {
+          "id": "t6c1",
+          "text": "Verizon has $8.1 billion of debt principal coming due in 2029.",
+          "source_id": "S3",
+          "label": "verified"
+        },
+        {
+          "id": "t6c2",
+          "text": "Verizon has $11.1 billion of debt principal coming due in 2030.",
+          "source_id": "S3",
+          "label": "verified"
+        },
+        {
+          "id": "t6c3",
+          "text": "Verizon has $96.8 billion of debt principal coming due after 2030.",
+          "source_id": "S3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/06-bear.mp3"
+    },
+    {
+      "turn": 7,
+      "speaker": "bull",
+      "from_user": false,
+      "text": "Having $8.1 billion coming due in 2029 is easily manageable given the company's strong earnings outlook. Verizon raised its full-year 2026 guidance to project free cash flow growth of 9 to 10 percent. Additionally, its robust interest coverage of 7.11x proves the company has plenty of room to service its debt.",
+      "claims": [
+        {
+          "id": "t7c1",
+          "text": "Verizon raised its full-year 2026 guidance to project free cash flow growth of 9 to 10 percent.",
+          "source_id": "N4",
+          "label": "verified"
+        },
+        {
+          "id": "t7c2",
+          "text": "Verizon has an interest coverage ratio of 7.11x.",
+          "source_id": "S3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/07-bull.mp3"
+    },
+    {
+      "turn": 8,
+      "speaker": "bear",
+      "from_user": false,
+      "text": "Projecting free cash flow growth of 9 to 10 percent offers false comfort when shareholder payouts take priority over debt reduction. Management increased its full-year share repurchase target to up to $4.5 billion, diverting cash away from deleveraging. That capital allocation strategy leaves creditors exposed to a total debt load of $158.2 billion.",
+      "claims": [
+        {
+          "id": "t8c1",
+          "text": "Verizon increased its full-year share repurchase target to up to $4.5 billion.",
+          "source_id": "N4",
+          "label": "verified"
+        },
+        {
+          "id": "t8c2",
+          "text": "Verizon reported total debt of $158.2 billion.",
+          "source_id": "S3",
+          "label": "verified"
+        }
+      ],
+      "audio_url": "/demo/VZ/08-bear.mp3"
+    }
+  ],
+  "brief": {
+    "agreed": [
+      {
+        "text": "Verizon generated $6.43 billion in free cash flow in Q2 2026 while holding $158.2 billion in total debt.",
+        "claim_ids": [
+          "t1c1",
+          "t2c1"
+        ]
+      },
+      {
+        "text": "The company holds $31 billion in total immediate liquidity alongside an interest coverage ratio of 7.11x.",
+        "claim_ids": [
+          "t3c1",
+          "t7c2"
+        ]
+      }
+    ],
+    "disputed": [
+      {
+        "topic": "Debt burden vs immediate liquidity strength",
+        "bull": "Verizon holds $31 billion in immediate liquidity and reported $17.2 billion in annual net income to support its obligations.",
+        "bear": "The $158.2 billion total debt load presents heavy refinancing risk with $17.3 billion coming due in 2026 alone.",
+        "claim_ids": [
+          "t3c1",
+          "t3c2",
+          "t2c1",
+          "t2c2"
+        ]
+      },
+      {
+        "topic": "FCF growth vs share repurchases",
+        "bull": "Free cash flow growth is projected at 9 to 10 percent for full-year 2026, backing the company's financial flexibility.",
+        "bear": "Management increased full-year share repurchases up to $4.5 billion, prioritizing equity holders over debt reduction.",
+        "claim_ids": [
+          "t7c1",
+          "t8c1"
+        ]
+      }
+    ],
+    "unsupported": [],
+    "open_questions": [
+      {
+        "question": "How will floating-rate debt affect total interest expense if rates remain elevated?",
+        "where_to_look": "10-K · p. 47"
+      },
+      {
+        "question": "What is the breakdown of the $17.3 billion maturing in 2026 across different senior credit instruments?",
+        "where_to_look": "10-K · Financial statements"
+      }
+    ]
+  },
+  "recorded_from": "fc201213fcd2"
+}
