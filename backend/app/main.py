@@ -283,7 +283,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             await answer(_other(next_side), question)  # answers too, and engages the first answer
 
         next_side, spoken, cross_examined = "bull", 0, False
-        redos = 2  # a dropped turn gets a fresh try, so one side doesn't speak twice in a row
+        redo = True  # every turn gets one fresh try if dropped, so one bad patch can't wipe out several turns
         while spoken < debate.max_turns:
             await pace(wake=interrupts)  # write the next line while the current one plays
             if not interrupts.empty():
@@ -305,12 +305,12 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             if _last_analyst(debate) == next_side:  # a dropped answer above: still never twice in a row
                 next_side = _other(next_side)
             if await analyst(next_side):
-                next_side, spoken = _other(next_side), spoken + 1
-            elif redos:
-                redos -= 1  # dropped: same side tries again without using up the debate
+                next_side, spoken, redo = _other(next_side), spoken + 1, True
+            elif redo:
+                redo = False  # dropped: same side tries again without using up the debate
             else:
-                spoken += 1  # out of redos: use up the slot, but the same side still speaks next
-                # so nobody speaks twice in a row
+                spoken, redo = spoken + 1, True  # dropped twice: use up the slot, but the same side
+                # still speaks next so nobody speaks twice in a row
 
         def write_brief():
             """Written while the last line plays, so it's ready when the debate ends."""
