@@ -29,3 +29,6 @@ next-env.d.ts
 .next-verify/
 .vercel
 .env*
+
+# Local backup of demo debates (clips live in Supabase)
+demo-backup/
