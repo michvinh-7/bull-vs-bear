@@ -84,6 +84,7 @@ def health():
         "ok": True,
         "gemini": {"model": config.GEMINI_MODEL, "key": "set" if config.GEMINI_API_KEY else "missing"},
         "voice": config.VOICE_ENABLED,
+        "voice_setup": voice.setup(),
         "storage": "supabase" if store._client else "memory",
         "fact_check": fact_check["state"],
     }

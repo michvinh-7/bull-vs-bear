@@ -42,10 +42,18 @@ def _tts(voice_id: str, text: str) -> bytes | None:
     return None
 
 
+def setup() -> dict:
+    """Which voice settings the server can see, never their values: shown on /health."""
+    return {"key": "set" if config.ELEVENLABS_API_KEY else "missing",
+            **{speaker: "set" if vid else "missing" for speaker, vid in VOICES.items()}}
+
+
 def speak(text: str, speaker: str, debate_id: str, turn: int) -> str:
     """Turn a line into speech, upload it, and return a public audio URL ("" on any failure)."""
     voice_id = VOICES.get(speaker)
     if not config.ELEVENLABS_API_KEY or not voice_id:
+        missing = "ELEVENLABS_API_KEY" if not config.ELEVENLABS_API_KEY else f"ELEVENLABS_VOICE_{speaker.upper()}"
+        print(f"[voice] skipped, {missing} is empty: line plays as text")
         return ""
     audio = _tts(voice_id, text)
     if audio is None:
