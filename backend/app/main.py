@@ -106,6 +106,9 @@ def list_models():
     return usage.models_payload()
 
 
+# Debates being generated right now, so a second connection can't start a second copy.
+_live: set[str] = set()
+
 # Users' own Gemini keys, by debate id: memory only, dropped when the debate ends
 # (or after an hour if it never starts). Never saved, logged or returned.
 _user_keys: dict[str, tuple[str, float]] = {}
@@ -166,6 +169,7 @@ async def debate_socket(ws: WebSocket, debate_id: str):
          {"type": "brief",      "data": CommitteeBrief}
          {"type": "usage",      "data": Usage}       (after positions, each line and the brief)
          {"type": "error",      "message": str}
+         {"type": "interrupted"}   (reconnected to a half-finished debate: what was said is replayed first)
        Client -> server messages:
          {"type": "interrupt", "question": str}
          {"type": "played", "turn": int}      (optional: line `turn` finished playing)
@@ -192,9 +196,18 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         await _replay(ws, debate)
         return
 
+    # A debate that already started (a refresh, a second tab) is never run again: that would
+    # re-run the whole debate on top of what was said, doubling the spend. Show what was said.
+    if debate.id in _live or debate.lines:
+        await _replay(ws, debate)
+        await ws.send_json({"type": "interrupted"})
+        return
+    _live.add(debate.id)
+
     interrupts: asyncio.Queue[str] = asyncio.Queue()
     pacer = Pacer()
-    listener = asyncio.create_task(_listen(ws, interrupts, pacer))
+    gone = asyncio.Event()  # set when the browser leaves: stop at the next line, spend nothing more
+    listener = asyncio.create_task(_listen(ws, interrupts, pacer, gone))
 
     # Count every Gemini call and voice clip for this debate, using the user's key if they gave one.
     debate.model = debate.model or config.GEMINI_MODEL
@@ -206,9 +219,13 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         await ws.send_json({"type": "usage", "data": debate.usage.model_dump()})
 
     async def pace(wake: asyncio.Queue | None = None, at_most: int = 1):
-        """Hold until the listener is at most `at_most` lines behind (or a question arrives on `wake`)."""
+        """Hold until the listener is at most `at_most` lines behind (or a question arrives on `wake`).
+        Raises WebSocketDisconnect once the browser is gone, so nothing more is generated."""
         if config.PACING:
-            await pacer.wait(at_most, wake)
+            while pacer.unfinished() > at_most and (wake is None or wake.empty()) and not gone.is_set():
+                await asyncio.sleep(0.2)
+        if gone.is_set():
+            raise WebSocketDisconnect(1001)
 
     try:
         # build_fact_sheet serves a cached sheet in under a second (demo companies are pre-built
@@ -224,6 +241,8 @@ async def debate_socket(ws: WebSocket, debate_id: str):
         interrupts_used = 0
 
         async def start(speaker: str) -> int:
+            if gone.is_set():
+                raise WebSocketDisconnect(1001)
             turn = len(debate.lines) + 1
             await ws.send_json({"type": "turn_start", "turn": turn, "speaker": speaker, "max_turns": planned})
             return turn
@@ -351,6 +370,10 @@ async def debate_socket(ws: WebSocket, debate_id: str):
             pass  # the client already left
     finally:
         listener.cancel()
+        _live.discard(debate.id)
+        if debate.status == "running" and debate.lines:
+            debate.status = "interrupted"  # half a debate: replayable, never restarted
+            store.save_debate(debate)
         usage.leave(ctx_token)
         _user_keys.pop(debate.id, None)  # the user's key is gone once the debate ends
 
@@ -396,7 +419,7 @@ def _last_analyst(debate: Debate) -> str | None:
     return next((line.speaker for line in reversed(debate.lines) if line.speaker != "moderator"), None)
 
 
-async def _listen(ws: WebSocket, interrupts: asyncio.Queue, pacer: Pacer):
+async def _listen(ws: WebSocket, interrupts: asyncio.Queue, pacer: Pacer, gone: asyncio.Event | None = None):
     try:
         while True:
             msg = await ws.receive_json()
@@ -404,8 +427,11 @@ async def _listen(ws: WebSocket, interrupts: asyncio.Queue, pacer: Pacer):
                 await interrupts.put(msg["question"])
             elif msg.get("type") == "played" and isinstance(msg.get("turn"), int):
                 pacer.played(msg["turn"])
-    except (WebSocketDisconnect, RuntimeError, ValueError):
-        pass
+    except (WebSocketDisconnect, RuntimeError):
+        if gone is not None:
+            gone.set()  # the browser closed: the debate stops at its next line
+    except ValueError:
+        pass  # malformed message: stop listening, the debate itself carries on
 
 
 async def _replay(ws: WebSocket, debate: Debate):

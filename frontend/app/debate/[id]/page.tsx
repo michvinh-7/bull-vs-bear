@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import Bubble from "@/components/debate/Bubble";
@@ -9,6 +9,7 @@ import SidePanel, { type PanelStatus } from "@/components/debate/SidePanel";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Logo from "@/components/Logo";
+import NewDebateButton from "@/components/NewDebateButton";
 import SettingsSheet from "@/components/SettingsSheet";
 import { ThemeToggle } from "@/components/theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,7 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ClaimBadge from "@/components/ClaimBadge";
-import { USE_MOCK } from "@/lib/api";
+import { startDebate, USE_MOCK } from "@/lib/api";
+import { unlockAudio } from "@/lib/audio";
+import { isDemoId } from "@/lib/demo";
+import { getApiKey, getModel } from "@/lib/settings";
 import { findSource, formatMetric, metricsMentioned } from "@/lib/format";
 import { closedReason, MAX_QUESTIONS, serverFinished } from "@/lib/questions";
 import type { Label, Metric, Side } from "@/lib/types";
@@ -25,7 +29,7 @@ import { usePlayback } from "@/lib/usePlayback";
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage, reportPlayed } = useDebate(id);
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage, reportPlayed, interrupted } = useDebate(id);
   const play = usePlayback(lines, reportPlayed);
   const [question, setQuestion] = useState("");
   const [selected, setSelected] = useState<SelectedClaim | null>(null);
@@ -49,23 +53,37 @@ export default function DebateRoom() {
     if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight;
   }, [play.shown.length, play.progress, waitingQuestion, thinkingSpeaker]);
 
-  // Always bring the closing card into view when the debate ends.
+  // Always bring the closing card (or the interrupted card) into view when the debate ends.
   const done = play.finished && !!brief;
+  const cutOff = interrupted && play.caughtUp && !brief;
+  useEffect(() => {
+    const el = floorRef.current;
+    if ((done || cutOff) && el) setTimeout(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }), 100);
+  }, [done, cutOff]);
+
+  // A real debate still being generated: leaving ends it for good, so warn first.
+  const generating = !USE_MOCK && !isDemoId(id) && !replay && !interrupted && !brief && status !== "error";
+  useEffect(() => {
+    if (!generating) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ""; // the browser shows its own "Leave site?" prompt
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [generating]);
 
   // Why the interrupt bar is closed, if it is. The backend writes ahead of the audio,
   // so it can stop taking questions before the audience hears the last line.
   const questionsAsked = lines.filter((l) => l.from_user).length + (pendingQuestion ? 1 : 0);
   const reason = closedReason({
+    interrupted,
     replay,
     done,
     serverFinished: !USE_MOCK && serverFinished({ brief: !!brief }),
     asked: questionsAsked,
     waiting: !!waitingQuestion,
   });
-  useEffect(() => {
-    const el = floorRef.current;
-    if (done && el) setTimeout(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }), 100);
-  }, [done]);
 
   const turn = play.current?.turn ?? play.shown.at(-1)?.turn;
   // Lines whose labels the audience has already seen (excludes the one being spoken).
@@ -89,10 +107,12 @@ export default function DebateRoom() {
             {status === "live" && !play.finished && <span className="size-2 animate-pulse rounded-full bg-unsupported" />}
             <span>
               {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
-              {maxTurns && turn && !play.finished ? ` · Turn ${turn} of ${maxTurns}` : ""}
+              {maxTurns && turn && !play.finished && !interrupted ? ` · Turn ${turn} of ${maxTurns}` : ""}
               {play.finished && brief ? " · Debate finished" : ""}
+              {interrupted ? " · Interrupted" : ""}
             </span>
           </div>
+          <NewDebateButton confirmLeave={generating} />
           <SettingsSheet current={usage} />
           <ThemeToggle />
         </div>
@@ -163,6 +183,9 @@ export default function DebateRoom() {
               <p className={`text-sm italic ${SPEAKER[thinkingSpeaker].text}`}>{SPEAKER[thinkingSpeaker].name} is thinking…</p>
             )}
             {play.finished && brief && <ClosingCard heard={heard} briefHref={`/brief/${id}`} />}
+            {cutOff && (
+              <InterruptedCard ticker={factSheet?.ticker} company={factSheet?.company} />
+            )}
             {play.shown.length === 0 && !play.blocked && (
               <p className="m-auto text-sm text-muted-foreground">The committee is taking its seats…</p>
             )}
@@ -190,6 +213,7 @@ export default function DebateRoom() {
               <Mic /> Interrupt
             </Button>
             <Input
+              autoComplete="off"
               className="rounded-full"
               placeholder={reason ?? `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
               value={question}
@@ -292,4 +316,41 @@ function useLabelHint() {
       } catch {}
     },
   };
+}
+
+/** Reopened mid-debate (a refresh, another tab): what was said is above; offer a fresh start. */
+function InterruptedCard({ ticker, company }: { ticker?: string; company?: string }) {
+  const router = useRouter();
+  const [starting, setStarting] = useState(false);
+  return (
+    <div className="mt-2 flex flex-col items-center gap-3 rounded-xl border border-contested/40 bg-contested/5 p-5 text-center animate-in fade-in-0">
+      <div>
+        <div className="font-display text-lg font-bold">This debate was interrupted</div>
+        <p className="text-sm text-muted-foreground">
+          The page was reloaded or opened elsewhere before it finished, so it can’t continue. Above is everything that was said.
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        {ticker && (
+          <Button
+            disabled={starting}
+            onClick={async () => {
+              unlockAudio(); // inside the click, before any await
+              setStarting(true);
+              try {
+                router.push(`/debate/${await startDebate(ticker, { model: getModel(), apiKey: getApiKey() })}`);
+              } catch {
+                setStarting(false);
+              }
+            }}
+          >
+            {starting ? "Starting…" : `Start a new debate on ${company ?? ticker}`}
+          </Button>
+        )}
+        <Button asChild variant="outline">
+          <Link href="/">Pick another company</Link>
+        </Button>
+      </div>
+    </div>
+  );
 }
