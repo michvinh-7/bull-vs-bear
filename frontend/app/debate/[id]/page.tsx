@@ -25,8 +25,8 @@ import { usePlayback } from "@/lib/usePlayback";
 
 export default function DebateRoom() {
   const { id } = useParams<{ id: string }>();
-  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage } = useDebate(id);
-  const play = usePlayback(lines);
+  const { factSheet, positions, lines, brief, thinking, maxTurns, status, error, interrupt, pendingQuestion, replay, usage, reportPlayed } = useDebate(id);
+  const play = usePlayback(lines, reportPlayed);
   const [question, setQuestion] = useState("");
   const [selected, setSelected] = useState<SelectedClaim | null>(null);
   const floorRef = useRef<HTMLDivElement>(null);
@@ -58,7 +58,7 @@ export default function DebateRoom() {
   const reason = closedReason({
     replay,
     done,
-    serverFinished: !USE_MOCK && serverFinished({ brief: !!brief, lines: lines.length, maxTurns, thinking: !!thinking }),
+    serverFinished: !USE_MOCK && serverFinished({ brief: !!brief }),
     asked: questionsAsked,
     waiting: !!waitingQuestion,
   });

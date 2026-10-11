@@ -120,6 +120,7 @@ export default function Home() {
           </div>
 
           <Card className="gap-3 p-4 shadow-2xl shadow-black/10 dark:shadow-black/40">
+            <p className="text-center text-[11px] text-muted-foreground">Example exchange · sample company</p>
             <PreviewBubble
               side="bull"
               text="Leverage looks high at 5.8x, but the term loan is secured by owned stores. Lenders get paid first."
