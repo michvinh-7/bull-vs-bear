@@ -23,14 +23,26 @@ _FLOATING = re.compile(r"SOFR|LIBOR|EURIBOR|SONIA|base rate|prime|floating|varia
 # term loan row says "10.731%")
 _BANK_LOAN = re.compile(r"term loan|credit facilit|credit agreement|revolv", re.I)
 
-def _generate(contents: str, **settings):
+def _generate(contents: str, thinking: str | None = "low", **settings):
     """One Gemini call with the debate's key and model (the user's own from Settings, else the
-    server's), counted in the debate's usage like every other call."""
+    server's), counted in the debate's usage like every other call.
+
+    Thinking is "low" by default: finding and copying text needs little reasoning, and it
+    made the debt step about 4x faster (21 s -> 5 s for Amazon) and news about 1.5x faster.
+    None leaves it to the model's default."""
     from google.genai import types
 
     ctx = usage.current()
-    resp = agents._client_for(ctx).models.generate_content(
-        model=ctx.model if ctx else config.GEMINI_MODEL,
+    model = ctx.model if ctx else config.GEMINI_MODEL
+    if thinking:
+        # raised to the model's floor where needed (Pro can't go below "low")
+        settings["thinking_config"] = types.ThinkingConfig(thinking_level=usage.thinking_for(model, thinking))
+    # held in a variable for the whole call: if the news and debt steps both create the
+    # shared client at once, the one that gets replaced would otherwise be garbage collected,
+    # and Google's library closes its connection mid-request ("client has been closed")
+    client = agents._client_for(ctx)
+    resp = client.models.generate_content(
+        model=model,
         contents=contents,
         # longer than a debate turn's 20 s: a search or a 30-page read takes a while, and
         # it's done once per company before the debate starts
@@ -65,6 +77,8 @@ For each one, copy from the pages below, exactly as written:
   - rate_as_written: the interest rate as it appears in the quote, e.g. "SOFR plus 4.25%" or "7.5%"
   - maturity_year: the year it matures, as in the quote
   - seniority: senior_secured, senior_unsecured or subordinated
+Use rows for actual notes, loans or facilities. Don't use summary rows that group debt by
+maturity bucket ("< 5 Years", "5-10 Years", "> 10 Years"): they don't name a maturity year.
 Use the amount outstanding at the end of fiscal {fiscal_year}, not the year before. Skip
 anything that was repaid, terminated or isn't outstanding at year end. Do not
 calculate, round or combine anything.
@@ -173,20 +187,26 @@ def check_instrument(raw: dict, text: str, fiscal_year: int) -> tuple[dict, str,
 
 
 def debt_instruments(text: str, company: str, fiscal_year: int) -> list[tuple[dict, str, str | None]]:
-    """[(DebtInstrument fields minus source_id, quote, page)], largest first."""
-    resp = _generate(
-        DEBT_PROMPT.format(company=company, fiscal_year=fiscal_year, pages=_debt_pages(text)),
-        temperature=0,
-        response_mime_type="application/json",
-        response_schema=_Instruments,
-    )
+    """[(DebtInstrument fields minus source_id, quote, page)], largest first.
+
+    Tries low thinking first. If most of what it returns fails the checks (it sometimes
+    reads a maturity-bucket summary table instead of the notes, as with Verizon), it tries
+    once more with the model's default thinking: slower, but it reads the right table."""
+    prompt = DEBT_PROMPT.format(company=company, fiscal_year=fiscal_year, pages=_debt_pages(text))
+    for thinking in ("low", None):
+        resp = _generate(prompt, thinking=thinking, temperature=0, response_mime_type="application/json",
+                         response_schema=_Instruments)
+        raw = _Instruments.model_validate_json(resp.text).model_dump()["instruments"]
+        checked = [(r, check_instrument(r, text, fiscal_year)) for r in raw]
+        if sum(1 for _, c in checked if c) * 2 >= len(raw):
+            break
+        print(f"[research] {sum(1 for _, c in checked if c)}/{len(raw)} debt rows held up with low thinking; trying again")
     out, seen = [], set()
-    for raw in _Instruments.model_validate_json(resp.text).model_dump()["instruments"]:
-        checked = check_instrument(raw, text, fiscal_year)
-        if not checked:
-            print(f"[research] dropped debt row that didn't match the filing: {raw['name']!r}")
+    for raw_row, checked_row in checked:
+        if not checked_row:
+            print(f"[research] dropped debt row that didn't match the filing: {raw_row['name']!r}")
             continue
-        fields, quote, pos = checked
+        fields, quote, pos = checked_row
         key = (fields["name"].lower(), fields["maturity_year"], fields["amount_usd"])
         if key not in seen:
             seen.add(key)
