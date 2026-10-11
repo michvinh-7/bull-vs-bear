@@ -202,3 +202,54 @@ def test_research_uses_the_debates_key_and_counts_its_calls(monkeypatch):
         facts.build_fact_sheet("VZ")
     assert sorted(used) == [("users-own-key", "gemini-3.6-flash")] * 2  # debt + news
     assert ctx.usage.calls == 2 and ctx.usage.input_tokens == 2000
+
+
+def fake_gemini(monkeypatch, replies):
+    """research._generate answering from `replies` in order; records the thinking asked for."""
+    asked = []
+
+    def generate(contents, thinking="low", **settings):
+        asked.append(thinking)
+        return SimpleNamespace(text=replies[len(asked) - 1])
+    monkeypatch.setattr(research, "_generate", generate)
+    return asked
+
+
+GOOD_ROW = ('{"name": "7.5% First Lien Notes due 2029", "amount_as_written": "360.0", "rate_as_written": "7.5%", '
+            '"maturity_year": 2029, "seniority": "senior_secured", "quote": "7.5% First Lien Notes due 2029 | 360.0 | 950.0"}')
+# a maturity-bucket summary row: real numbers, but no maturity year in it, so the checks drop it
+BUCKET_ROW = ('{"name": "> 10 Years", "amount_as_written": "360.0", "rate_as_written": "7.5%", "maturity_year": 2036, '
+              '"seniority": "senior_unsecured", "quote": "7.5% First Lien Notes due 2029 | 360.0 | 950.0"}')
+
+
+def test_debt_step_uses_low_thinking_when_it_holds_up(monkeypatch):
+    asked = fake_gemini(monkeypatch, [f'{{"instruments": [{GOOD_ROW}]}}'])
+    rows = research.debt_instruments(FILING, "AMC", 2025)
+    assert asked == ["low"] and [f["amount_usd"] for f, _, _ in rows] == [360e6]
+
+
+def test_debt_step_retries_with_default_thinking_when_low_thinking_reads_the_wrong_table(monkeypatch):
+    asked = fake_gemini(monkeypatch, [f'{{"instruments": [{BUCKET_ROW}, {BUCKET_ROW}]}}', f'{{"instruments": [{GOOD_ROW}]}}'])
+    rows = research.debt_instruments(FILING, "AMC", 2025)
+    assert asked == ["low", None] and [f["amount_usd"] for f, _, _ in rows] == [360e6]
+
+
+def test_generate_asks_for_low_thinking_at_the_models_floor(monkeypatch):
+    from app import agents, usage
+    from app.usage import DebateContext, Usage
+
+    configs = []
+
+    class FakeModels:
+        def generate_content(self, model, contents, config):
+            configs.append(config.thinking_config)
+            return SimpleNamespace(usage_metadata=None)
+
+    monkeypatch.setattr(agents, "_client_for", lambda ctx: SimpleNamespace(models=FakeModels()))
+    research._generate("x")
+    research._generate("x", thinking=None)
+    with usage.debate_context(DebateContext(model="gemini-3.1-pro-preview", usage=Usage(model="gemini-3.1-pro-preview"))):
+        research._generate("x", thinking="minimal")  # Pro can't go below "low"
+    assert configs[0].thinking_level.value.lower() == "low"
+    assert configs[1] is None
+    assert configs[2].thinking_level.value.lower() == "low"
