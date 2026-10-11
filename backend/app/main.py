@@ -87,6 +87,7 @@ def health():
         "voice_setup": voice.setup(),
         "storage": "supabase" if store._client else "memory",
         "fact_check": fact_check["state"],
+        "fact_check_timeout": config.FACT_CHECK_TIMEOUT,  # seconds a line waits for labels
     }
 
 
