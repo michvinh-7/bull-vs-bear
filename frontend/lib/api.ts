@@ -1,4 +1,4 @@
-import type { CommitteeBrief, Debate, ModelsResponse } from "./types";
+import type { CommitteeBrief, Debate, DebateSummary, ModelsResponse } from "./types";
 import { mockDebate } from "./mock";
 import { mockModels } from "./mock/models";
 import { demoId, demoRecordings, isDemoId, loadDemo } from "./demo";
@@ -62,5 +62,24 @@ export async function getBrief(id: string): Promise<CommitteeBrief> {
   if (USE_MOCK) return mockDebate.brief!;
   const res = await fetch(`${API_URL}/debates/${id}/brief`);
   if (!res.ok) throw await errorFrom(res, "Brief not ready");
+  return res.json();
+}
+
+/** Past debates for the History page. Mock mode lists the recorded fallback debates. */
+export async function getHistory(): Promise<DebateSummary[]> {
+  if (USE_MOCK) {
+    const recordings = await demoRecordings();
+    return Promise.all(
+      recordings.map(async (r) => {
+        const d = await loadDemo(demoId(r.ticker));
+        const labels: DebateSummary["labels"] = {};
+        for (const l of d.lines) for (const c of l.claims) labels[c.label] = (labels[c.label] ?? 0) + 1;
+        return { id: d.id, ticker: r.ticker, company: r.company, as_of: d.fact_sheet?.as_of ?? null, updated_at: null,
+          model: d.model ?? null, lines: d.lines.length, labels, cost_usd: d.usage?.cost_usd ?? null, is_demo: true };
+      }),
+    );
+  }
+  const res = await fetch(`${API_URL}/debates`);
+  if (!res.ok) throw await errorFrom(res, "Couldn’t load past debates");
   return res.json();
 }

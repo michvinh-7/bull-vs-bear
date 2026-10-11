@@ -49,6 +49,36 @@ def load_debate(debate_id: str) -> Debate | None:
     return None
 
 
+# Only the fields the History list shows, so 50 debates load in well under a second.
+_HISTORY_FIELDS = (
+    "id,ticker,updated_at,is_demo,company:data->fact_sheet->>company,as_of:data->fact_sheet->>as_of,"
+    "model:data->>model,cost_usd:data->usage->cost_usd,lines:data->lines"
+)
+
+
+def list_finished(limit: int = 50) -> list[dict]:
+    """Finished debates that have a committee brief, newest first (the History page).
+    Unfinished, interrupted and errored runs are left out."""
+    if _client:
+        result = _safe("list debates", lambda: _client.table("debates").select(_HISTORY_FIELDS)
+                       .eq("data->>status", "done").not_.is_("data->brief->agreed", "null")
+                       .order("updated_at", desc=True).limit(limit).execute())
+        if result is not None:
+            return result.data
+    # In memory (local runs, or Supabase down): same shape.
+    done = [d for d in _debates.values() if d.status == "done" and d.brief is not None]
+    return [
+        {
+            "id": d.id, "ticker": d.ticker, "updated_at": None, "is_demo": False,
+            "company": d.fact_sheet.company if d.fact_sheet else None,
+            "as_of": d.fact_sheet.as_of if d.fact_sheet else None,
+            "model": d.model, "cost_usd": d.usage.cost_usd if d.usage else None,
+            "lines": [line.model_dump() for line in d.lines],
+        }
+        for d in reversed(done)
+    ][:limit]
+
+
 def save_fact_sheet(sheet: FactSheet) -> None:
     _fact_sheets[sheet.ticker] = sheet
     if _client:

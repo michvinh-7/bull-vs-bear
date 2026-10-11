@@ -112,6 +112,20 @@ export interface Usage {
   cost_usd: number | null;
 }
 
+/** One row of the History page (GET /debates): a finished debate with a brief. */
+export interface DebateSummary {
+  id: string;
+  ticker: string;
+  company: string | null;
+  as_of: string | null;
+  updated_at: string | null;
+  model: string | null;
+  lines: number;
+  labels: Partial<Record<Label, number>>;
+  cost_usd: number | null;
+  is_demo: boolean;
+}
+
 // ---- API / WebSocket ----
 
 export interface Debate {

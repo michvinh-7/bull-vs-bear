@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import ClaimBadge from "@/components/ClaimBadge";
 import CompanySearch from "@/components/CompanySearch";
 import Mascot from "@/components/debate/Mascot";
+import HistoryButton from "@/components/HistoryButton";
 import Logo from "@/components/Logo";
 import SettingsSheet from "@/components/SettingsSheet";
 import { ThemeToggle } from "@/components/theme";
@@ -54,6 +55,7 @@ export default function Home() {
             <Button variant="ghost" size="sm" asChild>
               <a href="#how">How it works</a>
             </Button>
+            <HistoryButton />
             <SettingsSheet />
             <ThemeToggle />
           </div>

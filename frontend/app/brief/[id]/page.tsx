@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FileSearch, Plus, RotateCcw } from "lucide-react";
+import { ChevronDown, FileSearch, MessagesSquare, Plus, RotateCcw } from "lucide-react";
 import ClaimBadge from "@/components/ClaimBadge";
 import Mascot from "@/components/debate/Mascot";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
+import Bubble from "@/components/debate/Bubble";
+import HistoryButton from "@/components/HistoryButton";
 import Logo from "@/components/Logo";
 import NewDebateButton from "@/components/NewDebateButton";
 import SettingsSheet from "@/components/SettingsSheet";
@@ -182,6 +184,9 @@ export default function BriefPage() {
         </ol>
       </Section>
 
+      {/* The whole debate as text, at once: no waiting for playback */}
+      <Transcript debate={debate} onClaim={(claim, line) => open({ claim, speaker: line.speaker })} />
+
       {/* Footer */}
       <section className="flex flex-col items-center gap-4 border-t pt-6 text-center">
         <p className="text-sm text-muted-foreground">{DISCLAIMER}</p>
@@ -208,6 +213,7 @@ function Shell({ id, usage, children }: { id: string; usage?: Usage | null; chil
         <div className="flex items-center gap-1">
           <ReplayButton id={id} variant="ghost" />
           <NewDebateButton />
+          <HistoryButton />
           <SettingsSheet current={usage} />
           <ThemeToggle />
         </div>
@@ -221,8 +227,10 @@ function Shell({ id, usage, children }: { id: string; usage?: Usage | null; chil
 function ReplayButton({ id, variant = "default" }: { id: string; variant?: "default" | "ghost" }) {
   return (
     <Button asChild variant={variant} size={variant === "ghost" ? "sm" : "default"}>
-      <Link href={`/debate/${id}?replay=1`} onClick={unlockAudio}>
-        <RotateCcw /> Replay debate
+      <Link href={`/debate/${id}?replay=1`} onClick={unlockAudio} aria-label="Replay debate" title="Replay debate">
+        <RotateCcw />
+        {/* In the header on phones, just the icon; the footer button always has its label */}
+        <span className={variant === "ghost" ? "hidden sm:inline" : ""}>Replay debate</span>
       </Link>
     </Button>
   );
@@ -286,4 +294,38 @@ function Citations({ found, sheet, onOpen }: { found: Found[]; sheet: Debate["fa
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-muted-foreground">{children}</p>;
+}
+
+/** Every line of the debate shown at once, with clickable labels. Collapsed by default. */
+function Transcript({ debate, onClaim }: { debate: Debate; onClaim: (claim: Claim, line: Debate["lines"][number]) => void }) {
+  const [show, setShow] = useState(false);
+  if (!debate.lines.length) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <button
+          onClick={() => setShow(!show)}
+          aria-expanded={show}
+          className="flex w-full items-center justify-between gap-3 text-left focus-visible:outline-hidden"
+        >
+          <span className="flex flex-col gap-1">
+            <CardTitle className="flex items-center gap-2 font-display text-lg">
+              <MessagesSquare className="size-4" /> Full transcript
+            </CardTitle>
+            <CardDescription>
+              All {debate.lines.length} lines, with every claim’s label. Tap a label to see its source.
+            </CardDescription>
+          </span>
+          <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition ${show ? "rotate-180" : ""}`} />
+        </button>
+      </CardHeader>
+      {show && (
+        <CardContent className="flex flex-col gap-3">
+          {debate.lines.map((l) => (
+            <Bubble key={l.turn} line={l} sheet={debate.fact_sheet} active={false} progress={1} onClaim={onClaim} />
+          ))}
+        </CardContent>
+      )}
+    </Card>
+  );
 }
