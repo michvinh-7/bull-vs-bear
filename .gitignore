@@ -27,3 +27,5 @@ out/
 # Next.js regenerates this on every dev/build
 next-env.d.ts
 .next-verify/
+.vercel
+.env*
