@@ -107,6 +107,30 @@ def test_voice_out_of_credits_is_not_retried(eleven):
     assert voice.speak("Hi there.", "bull", "d1", 1) == "" and eleven == []
 
 
+@pytest.mark.parametrize("text, said", [
+    ("AMC generated $1,596.7 million in total revenues.", "AMC generated $1.6 billion in total revenues."),
+    ("Interest coverage sits at 64.09x and leverage at 0.48x.", "Interest coverage sits at 64.09 times and leverage at 0.48 times."),
+    ("It holds $12.0 billion of unused capacity.", "It holds $12 billion of unused capacity."),
+    ("the $2 billion Verizon 6.000% notes due 2065", "the $2 billion Verizon 6% notes due 2065"),
+    ("An upgrade to 'B-' from S&P, and BB+ next.", "An upgrade to 'B minus' from S&P, and BB plus next."),
+    ("A $416 million loan, $545.2 million due in 2027, debt-to-EBITDA of 3.32x.",
+     "A $416 million loan, $545.2 million due in 2027, debt-to-EBITDA of 3.32 times."),
+    ("Year-over-year sales rose 20% to $200.6 billion.", "Year-over-year sales rose 20% to $200.6 billion."),
+])
+def test_voice_says_numbers_the_way_people_do(text, said):
+    assert voice.spoken(text) == said
+
+
+def test_voice_hears_spoken_numbers_but_the_screen_keeps_exact_ones(eleven):
+    sent = []
+    real_post = voice.httpx.post
+    eleven.append(resp(200))
+    voice.httpx.post = lambda *a, **k: (sent.append(k["json"]["text"]), real_post(*a, **k))[1]
+    line = "Coverage is 7.11x."
+    voice.speak(line, "bull", "d1", 1)
+    assert sent == ["Coverage is 7.11 times."] and line == "Coverage is 7.11x."
+
+
 def test_voice_upload_failure_is_text_only(eleven, monkeypatch):
     def broken(data, path):
         raise RuntimeError("bucket missing")
