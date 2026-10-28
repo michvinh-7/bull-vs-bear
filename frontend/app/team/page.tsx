@@ -24,7 +24,7 @@ const TEAM = [
   },
   {
     name: "Fahim Taleb",
-    role: "AI agents and the debate engine",
+    role: "AI agents, debate engine, voice and database",
     photo: "/team/fahim.jpg",
     linkedin: "https://www.linkedin.com/in/fahim-taleb-4395ba31a/",
   },
