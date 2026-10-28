@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -53,8 +54,11 @@ export default function Home() {
         <nav className="flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
               <a href="#how">How it works</a>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/team">Team</Link>
             </Button>
             <HistoryButton />
             <SettingsSheet />
