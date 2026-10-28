@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import AwardBadge from "@/components/AwardBadge";
 import ClaimBadge from "@/components/ClaimBadge";
 import CompanySearch from "@/components/CompanySearch";
 import Mascot from "@/components/debate/Mascot";
@@ -63,6 +64,7 @@ export default function Home() {
 
         {/* Hero */}
         <section className="flex flex-col items-center gap-6 text-center">
+          <AwardBadge />
           <Badge variant="outline" className="bg-card/70 text-muted-foreground">
             SEC filings · Gemini · ElevenLabs
           </Badge>
