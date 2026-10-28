@@ -185,6 +185,25 @@ def test_start_rejects_unknown_model_and_junk_keys(client):
     assert r.status_code == 400
 
 
+def test_own_key_required_when_the_team_key_is_off_limits(client, monkeypatch):
+    monkeypatch.setattr(config, "REQUIRE_USER_KEY", True)
+    assert client.get("/models").json()["requires_user_key"] is True
+    r = client.post("/debates", json={"ticker": "NWRC"})
+    assert r.status_code == 401 and "Gemini API key" in r.json()["detail"]
+    assert client.post("/debates", json={"ticker": "NWRC", "gemini_api_key": USER_KEY}).status_code == 200
+
+
+def test_debate_never_falls_back_to_the_team_key(client, monkeypatch):
+    # e.g. the server restarted between starting the debate and opening it: the key is gone
+    monkeypatch.setattr(config, "REQUIRE_USER_KEY", True)
+    debate_id = client.post("/debates", json={"ticker": "NWRC", "gemini_api_key": USER_KEY}).json()["debate_id"]
+    main._user_keys.pop(debate_id)
+    with client.websocket_connect(f"/ws/debates/{debate_id}") as ws:
+        msg = ws.receive_json()
+    assert msg["type"] == "error" and "Start a new debate" in msg["message"]
+    assert store.load_debate(debate_id).lines == []
+
+
 def test_users_key_is_held_in_memory_and_never_saved_or_returned(client, monkeypatch):
     saved = []
     real_save = store.save_debate

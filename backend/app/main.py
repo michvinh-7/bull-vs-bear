@@ -116,6 +116,7 @@ _live: set[str] = set()
 # (or after an hour if it never starts). Never saved, logged or returned.
 _user_keys: dict[str, tuple[str, float]] = {}
 KEY_TTL_SECONDS = 3600
+NEEDS_KEY = "Add your own Gemini API key in Settings to start a debate. You can create one in Google AI Studio."
 
 
 def _forget_stale_keys() -> None:
@@ -135,6 +136,8 @@ def start_debate(req: StartDebateRequest):
     key = (req.gemini_api_key or "").strip() or None
     if key and (len(key) < 20 or len(key) > 200 or any(c.isspace() for c in key)):
         raise HTTPException(400, "That doesn't look like a Gemini API key")
+    if not key and config.REQUIRE_USER_KEY:
+        raise HTTPException(401, NEEDS_KEY)
     if not companies.is_known(ticker):
         raise HTTPException(404, f"No public company with ticker {ticker}")
     debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS, model=model, usage=usage.Usage(model=model))
@@ -220,6 +223,12 @@ async def debate_socket(ws: WebSocket, debate_id: str):
     if debate.id in _live or debate.lines:
         await _replay(ws, debate)
         await ws.send_json({"type": "interrupted"})
+        return
+    # The user's key is only held in memory: a server restart or an hour's wait loses it, and
+    # the debate must not fall back to the team key.
+    if config.REQUIRE_USER_KEY and debate.id not in _user_keys:
+        await ws.send_json({"type": "error", "message": "This debate's API key is no longer on the server. Start a new debate."})
+        await ws.close()
         return
     _live.add(debate.id)
 

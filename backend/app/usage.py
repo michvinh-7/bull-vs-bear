@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from . import config
+
 # Paid-tier standard prices, USD per 1M tokens; output includes thinking tokens.
 # Source: https://ai.google.dev/gemini-api/docs/pricing (checked 2026-10-10).
 PRICES_CHECKED = "2026-10-10"
@@ -141,5 +143,6 @@ def models_payload() -> dict:
     return {
         "default": DEFAULT_MODEL,
         "prices_checked": PRICES_CHECKED,
+        "requires_user_key": config.REQUIRE_USER_KEY,
         "models": [{"id": mid, **{k: v for k, v in m.items() if k != "min_thinking"}} for mid, m in MODELS.items()],
     }

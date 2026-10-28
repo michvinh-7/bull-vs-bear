@@ -38,7 +38,8 @@ export default function SettingsSheet({ current }: { current?: Usage | null }) {
 
   const selected = settings.model ?? models?.default;
   const selectedModel = models?.models.find((m) => m.id === selected);
-  const needsOwnKey = selected?.includes("pro") && !settings.hasKey;
+  const keyRequired = !!models?.requires_user_key;
+  const needsOwnKey = !keyRequired && selected?.includes("pro") && !settings.hasKey;
 
   return (
     <Sheet>
@@ -95,8 +96,8 @@ export default function SettingsSheet({ current }: { current?: Usage | null }) {
           </Section>
 
           {/* API key */}
-          <Section title="Your Gemini API key" optional>
-            <KeyField hasKey={settings.hasKey} />
+          <Section title="Your Gemini API key" optional={!keyRequired}>
+            <KeyField hasKey={settings.hasKey} required={keyRequired} />
           </Section>
 
           {/* Usage */}
@@ -128,7 +129,7 @@ function Section({ title, optional, children }: { title: string; optional?: bool
   );
 }
 
-function KeyField({ hasKey }: { hasKey: boolean }) {
+function KeyField({ hasKey, required }: { hasKey: boolean; required: boolean }) {
   const [draft, setDraft] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +148,8 @@ function KeyField({ hasKey }: { hasKey: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Use your own key instead of the team’s. It’s sent only to our server, with each debate you start, and kept in this
+        {required ? "Debates run on your own key." : "Use your own key instead of the team’s."}{" "}
+        It’s sent only to our server, with each debate you start, and kept in this
         browser tab until you close it. It’s never saved or shown to anyone.
       </p>
       {hasKey ? (

@@ -98,6 +98,7 @@ export interface ModelOption {
 export interface ModelsResponse {
   default: string;
   prices_checked: string; // date the prices were copied from Google's pricing page
+  requires_user_key?: boolean; // debates need the visitor's own Gemini key (the team key is off limits)
   models: ModelOption[];
 }
 
