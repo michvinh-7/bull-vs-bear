@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Team · Bull vs Bear" };
 const TEAM = [
   {
     name: "Michael Nguyen",
-    role: "Frontend, architecture, data layer and settings",
+    role: "Full-stack: frontend, system design, data layer and cost tracking",
     photo: "/team/michael.jpg",
     linkedin: "https://www.linkedin.com/in/michael-vinh-nguyen/",
   },
