@@ -16,9 +16,9 @@ import { ThemeToggle } from "@/components/theme";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { startDebate } from "@/lib/api";
+import { getModels, startDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
-import { getApiKey, getModel } from "@/lib/settings";
+import { getApiKey, getModel, useSettings } from "@/lib/settings";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
 import type { Label } from "@/lib/types";
 
@@ -26,13 +26,25 @@ export default function Home() {
   const router = useRouter();
   const [companies, setCompanies] = useState<DemoCompany[]>(MOCK_COMPANIES);
   const [starting, setStarting] = useState<string | null>(null);
+  // The server only runs debates on the visitor's own Gemini key (Settings).
+  const [keyRequired, setKeyRequired] = useState(false);
+  const { hasKey } = useSettings();
 
   useEffect(() => {
     getCompanies().then(setCompanies);
+    getModels()
+      .then((m) => setKeyRequired(!!m.requires_user_key))
+      .catch(() => {});
   }, []);
 
   async function go(t: string) {
     if (!t.trim() || starting) return;
+    if (keyRequired && !getApiKey()) {
+      toast.error("Add your Gemini API key first", {
+        description: "Open Settings (the gear, top right) and paste your key. You can create one in Google AI Studio.",
+      });
+      return;
+    }
     unlockAudio(); // must run inside the click, before any await
     setStarting(t.trim().toUpperCase());
     try {
@@ -82,6 +94,11 @@ export default function Home() {
           </p>
 
           <CompanySearch onPick={go} busy={!!starting} />
+          {keyRequired && !hasKey && (
+            <p className="-mt-2 text-sm text-muted-foreground">
+              Debates run on your own Gemini API key. Add it in Settings (the gear, top right).
+            </p>
+          )}
         </section>
 
         {/* Demo companies */}

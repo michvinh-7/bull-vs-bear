@@ -13,6 +13,9 @@ def _env(name: str, default: str) -> str:
 
 GEMINI_API_KEY = _env("GEMINI_API_KEY", "")
 GEMINI_MODEL = _env("GEMINI_MODEL", "gemini-3.5-flash")
+# Debates must use the visitor's own Gemini key (Settings), so the team key isn't spent on
+# strangers. The server key is still used by scripts like cache_fact_sheets.py.
+REQUIRE_USER_KEY = _env("REQUIRE_USER_KEY", "true").lower() == "true"
 
 ELEVENLABS_API_KEY = _env("ELEVENLABS_API_KEY", "")
 VOICE_ID_BULL = _env("ELEVENLABS_VOICE_BULL", "")
