@@ -12,19 +12,19 @@ export const metadata: Metadata = { title: "Team · Bull vs Bear" };
 const TEAM = [
   {
     name: "Michael Nguyen",
-    role: "Frontend, architecture and debate lifecycle",
+    role: "Full-stack: frontend, system design, data layer and cost tracking",
     photo: "/team/michael.jpg",
     linkedin: "https://www.linkedin.com/in/michael-vinh-nguyen/",
   },
   {
     name: "Alanna Wong",
-    role: "SEC data, credit metrics and fact-checking",
+    role: "SEC data pipeline, credit metrics and fact-checker",
     photo: "/team/alanna.jpg",
     linkedin: "https://www.linkedin.com/in/alanna-wong-87a75213a/",
   },
   {
     name: "Fahim Taleb",
-    role: "AI agents, debate engine, voice and database",
+    role: "AI agents, guardrails, debate engine, voice and Supabase",
     photo: "/team/fahim.jpg",
     linkedin: "https://www.linkedin.com/in/fahim-taleb-4395ba31a/",
   },
