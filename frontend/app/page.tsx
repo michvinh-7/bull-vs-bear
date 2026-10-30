@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Milestone, Users } from "lucide-react";
 import { toast } from "sonner";
 import AwardBadge from "@/components/AwardBadge";
 import ClaimBadge from "@/components/ClaimBadge";
@@ -70,7 +70,16 @@ export default function Home() {
               <a href="#how">How it works</a>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/team">Team</Link>
+              <Link href="/journey" aria-label="Our journey" title="Our journey">
+                <Milestone />
+                <span className="hidden sm:inline">Journey</span>
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/team" aria-label="Team" title="Team">
+                <Users />
+                <span className="hidden sm:inline">Team</span>
+              </Link>
             </Button>
             <HistoryButton />
             <SettingsSheet />
