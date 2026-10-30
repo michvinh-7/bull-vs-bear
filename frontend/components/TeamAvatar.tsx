@@ -11,12 +11,12 @@ export default function TeamAvatar({ photo, name }: { photo: string; name: strin
     .join("")
     .slice(0, 2);
   return missing ? (
-    <span className="grid size-24 place-items-center rounded-full bg-muted font-display text-2xl font-bold text-muted-foreground">
+    <span className="grid size-28 place-items-center rounded-full bg-muted font-display text-2xl font-bold text-muted-foreground">
       {initials}
     </span>
   ) : (
     // A plain <img> so a missing file falls back to initials instead of a broken image.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={photo} alt={name} onError={() => setMissing(true)} className="size-24 rounded-full object-cover" />
+    <img src={photo} alt={name} onError={() => setMissing(true)} className="size-28 rounded-full object-cover" />
   );
 }
