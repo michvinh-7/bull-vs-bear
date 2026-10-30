@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -9,12 +8,8 @@ import AwardBadge from "@/components/AwardBadge";
 import ClaimBadge from "@/components/ClaimBadge";
 import CompanySearch from "@/components/CompanySearch";
 import Mascot from "@/components/debate/Mascot";
-import HistoryButton from "@/components/HistoryButton";
-import Logo from "@/components/Logo";
-import SettingsSheet from "@/components/SettingsSheet";
-import { ThemeToggle } from "@/components/theme";
+import SiteHeader from "@/components/SiteHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getModels, startDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
@@ -57,27 +52,13 @@ export default function Home() {
   }
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-clip">
+      <SiteHeader />
       {/* Bull-blue and bear-orange glows behind the hero */}
       <div aria-hidden className="pointer-events-none absolute -top-40 -left-40 size-[32rem] rounded-full bg-bull/20 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -top-24 -right-40 size-[28rem] rounded-full bg-bear/15 blur-3xl" />
 
-      <div className="relative mx-auto flex max-w-5xl flex-col gap-20 px-4 pt-6 pb-16">
-        <nav className="flex items-center justify-between">
-          <Logo />
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
-              <a href="#how">How it works</a>
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/team">Team</Link>
-            </Button>
-            <HistoryButton />
-            <SettingsSheet />
-            <ThemeToggle />
-          </div>
-        </nav>
-
+      <div className="relative mx-auto flex max-w-5xl flex-col gap-20 px-4 pt-14 pb-16">
         {/* Hero */}
         <section className="flex flex-col items-center gap-6 text-center">
           <AwardBadge />
@@ -103,7 +84,7 @@ export default function Home() {
 
         {/* Demo companies */}
         <section className="flex flex-col gap-4">
-          <h2 className="text-center text-sm text-muted-foreground">Or pick a demo company</h2>
+          <h2 className="eyebrow text-center">Or pick a demo company</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {companies.map((c) => (
               <button key={c.ticker} onClick={() => go(c.ticker)} disabled={!!starting} className="group text-left disabled:opacity-60">

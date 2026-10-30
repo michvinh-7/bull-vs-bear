@@ -8,11 +8,8 @@ import Bubble from "@/components/debate/Bubble";
 import SidePanel, { type PanelStatus } from "@/components/debate/SidePanel";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
-import Logo from "@/components/Logo";
-import NewDebateButton from "@/components/NewDebateButton";
-import SettingsSheet from "@/components/SettingsSheet";
-import { ThemeToggle } from "@/components/theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,160 +96,155 @@ export default function DebateRoom() {
   const hintTurn = hint.show ? heard.find((l) => l.claims.length > 0)?.turn : undefined;
 
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <Logo />
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            {status === "live" && !play.finished && <span className="size-2 animate-pulse rounded-full bg-unsupported" />}
-            <span>
-              {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
-              {maxTurns && turn && !play.finished && !interrupted ? ` · Turn ${turn} of ${maxTurns}` : ""}
-              {play.finished && brief ? " · Debate finished" : ""}
-              {interrupted ? " · Interrupted" : ""}
-            </span>
-          </div>
-          <NewDebateButton confirmLeave={generating} />
-          <SettingsSheet current={usage} />
-          <ThemeToggle />
+    <>
+      <SiteHeader usage={usage} confirmLeave={generating} />
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5">
+        <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
+          {status === "live" && !play.finished && <span className="size-2 animate-pulse rounded-full bg-unsupported" />}
+          <span>
+            {factSheet ? `${factSheet.company} (${factSheet.ticker}) · ${factSheet.as_of}` : "Loading…"}
+            {maxTurns && turn && !play.finished && !interrupted ? ` · Turn ${turn} of ${maxTurns}` : ""}
+            {play.finished && brief ? " · Debate finished" : ""}
+            {interrupted ? " · Interrupted" : ""}
+          </span>
         </div>
-      </header>
 
-      {/* Part of the data couldn't be fetched: older news, no debt table, EDGAR down */}
-      {factSheet?.notices?.map((n) => (
-        <p key={n} role="status" className="rounded-md border border-contested/40 bg-contested/10 px-3 py-2 text-sm">
-          {n}
-        </p>
-      ))}
-
-      {/* One swipeable row on phones, a grid from tablet up, one even row of however many metrics on desktop */}
-      <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-none lg:auto-cols-fr lg:grid-flow-col">
-        {factSheet?.metrics.map((m) => (
-          <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} sources={m.source_ids.map((sid) => findSource(factSheet, sid)?.label).filter(Boolean) as string[]} />
+        {/* Part of the data couldn't be fetched: older news, no debt table, EDGAR down */}
+        {factSheet?.notices?.map((n) => (
+          <p key={n} role="status" className="rounded-md border border-contested/40 bg-contested/10 px-3 py-2 text-sm">
+            {n}
+          </p>
         ))}
-      </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
-        <SidePanel side="bull" position={positions?.bull} heard={heard} status={panelStatus("bull")} paused={play.paused} />
+        {/* One swipeable row on phones, a grid from tablet up, one even row of however many metrics on desktop */}
+        <section className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-none lg:auto-cols-fr lg:grid-flow-col">
+          {factSheet?.metrics.map((m) => (
+            <MetricCard key={m.name} m={m} cited={citedMetrics.has(m.name)} sources={m.source_ids.map((sid) => findSource(factSheet, sid)?.label).filter(Boolean) as string[]} />
+          ))}
+        </section>
 
-        {/* On phones the floor comes first; side panels follow below it */}
-        <Card className="relative order-first gap-0 p-0 lg:order-none">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-3">
-              <h2 className="font-semibold">Committee floor</h2>
-              {play.speaker && (
-                <span className={`flex items-center gap-1.5 text-xs lg:hidden ${SPEAKER[play.speaker].text}`}>
-                  <span className="size-1.5 animate-pulse rounded-full bg-current" />
-                  {SPEAKER[play.speaker].name} speaking
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="icon" onClick={play.togglePause} aria-label={play.paused ? "Resume" : "Pause"}>
-                {play.paused ? <Play /> : <Pause />}
-              </Button>
-              <Button variant="outline" size="icon" onClick={play.toggleMute} aria-label={play.muted ? "Unmute" : "Mute"}>
-                {play.muted ? <VolumeX /> : <Volume2 />}
-              </Button>
-            </div>
-          </div>
+        <section className="grid gap-4 lg:grid-cols-[1fr_2fr_1fr]">
+          <SidePanel side="bull" position={positions?.bull} heard={heard} status={panelStatus("bull")} paused={play.paused} />
 
-          <div ref={floorRef} className="flex h-[58vh] flex-col gap-3 overflow-y-auto p-4 sm:h-[26rem] lg:h-[30rem]">
-            {play.shown.map((l) => (
-              <Bubble
-                key={l.turn}
-                line={l}
-                sheet={factSheet}
-                active={play.current?.turn === l.turn}
-                progress={play.progress}
-                onClaim={(claim, line) => {
-                  hint.dismiss();
-                  setSelected({ claim, speaker: line.speaker });
-                }}
-                hint={l.turn === hintTurn}
-              />
-            ))}
-            {waitingQuestion && (
-              <div className="max-w-[88%] self-center rounded-lg border border-dashed border-mod/50 bg-mod-bg/60 p-3 text-center text-sm">
-                <div className="text-xs font-semibold text-mod uppercase">You asked</div>
-                {waitingQuestion}
-                <div className="mt-1 text-xs text-muted-foreground">Sent. The committee takes it after this turn.</div>
-              </div>
-            )}
-            {thinkingSpeaker && (
-              <p className={`text-sm italic ${SPEAKER[thinkingSpeaker].text}`}>{SPEAKER[thinkingSpeaker].name} is thinking…</p>
-            )}
-            {play.finished && brief && <ClosingCard heard={heard} briefHref={`/brief/${id}`} />}
-            {cutOff && (
-              <InterruptedCard ticker={factSheet?.ticker} company={factSheet?.company} />
-            )}
-            {play.shown.length === 0 && !play.blocked && (
-              <p className="m-auto text-sm text-muted-foreground">The committee is taking its seats…</p>
-            )}
-          </div>
-
-          {play.blocked && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/80 backdrop-blur-sm">
-              <Button size="lg" onClick={play.unblock}>
-                <Play /> Play debate
-              </Button>
-              <p className="text-xs text-muted-foreground">Your browser needs a tap before it plays sound.</p>
-            </div>
-          )}
-
-          <form
-            className="flex flex-col gap-1.5 border-t p-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!question.trim() || reason) return;
-              interrupt(question.trim());
-              setQuestion("");
-            }}
-          >
-            <div className="flex gap-2">
-              {/* Only sending is ever blocked; the text stays editable so nothing typed gets stuck. */}
-              <Button
-                type="submit"
-                className="rounded-full bg-unsupported text-background hover:bg-unsupported/90"
-                disabled={!!reason || !question.trim()}
-              >
-                <Mic /> Interrupt
-              </Button>
-              <div className="relative flex-1">
-                <Input
-                  autoComplete="off"
-                  className="rounded-full pr-16"
-                  placeholder={reason ? "Questions are closed" : `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
-                  value={question}
-                  maxLength={MAX_QUESTION_CHARS}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  aria-describedby="question-status"
-                />
-                {question && (
-                  <span
-                    className={`pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 font-mono text-[11px] ${
-                      question.length >= MAX_QUESTION_CHARS - 30 ? "text-contested" : "text-muted-foreground"
-                    }`}
-                  >
-                    {question.length}/{MAX_QUESTION_CHARS}
+          {/* On phones the floor comes first; side panels follow below it */}
+          <Card className="relative order-first gap-0 p-0 lg:order-none">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="flex items-center gap-3">
+                <h2 className="font-semibold">Committee floor</h2>
+                {play.speaker && (
+                  <span className={`flex items-center gap-1.5 text-xs lg:hidden ${SPEAKER[play.speaker].text}`}>
+                    <span className="size-1.5 animate-pulse rounded-full bg-current" />
+                    {SPEAKER[play.speaker].name} speaking
                   </span>
                 )}
               </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" onClick={play.togglePause} aria-label={play.paused ? "Resume" : "Pause"}>
+                  {play.paused ? <Play /> : <Pause />}
+                </Button>
+                <Button variant="outline" size="icon" onClick={play.toggleMute} aria-label={play.muted ? "Unmute" : "Mute"}>
+                  {play.muted ? <VolumeX /> : <Volume2 />}
+                </Button>
+              </div>
             </div>
-            {reason && (
-              <p id="question-status" role="status" className="px-2 text-xs text-muted-foreground">
-                {reason}
-              </p>
+
+            <div ref={floorRef} className="flex h-[58vh] flex-col gap-3 overflow-y-auto p-4 sm:h-[26rem] lg:h-[30rem]">
+              {play.shown.map((l) => (
+                <Bubble
+                  key={l.turn}
+                  line={l}
+                  sheet={factSheet}
+                  active={play.current?.turn === l.turn}
+                  progress={play.progress}
+                  onClaim={(claim, line) => {
+                    hint.dismiss();
+                    setSelected({ claim, speaker: line.speaker });
+                  }}
+                  hint={l.turn === hintTurn}
+                />
+              ))}
+              {waitingQuestion && (
+                <div className="max-w-[88%] self-center rounded-lg border border-dashed border-mod/50 bg-mod-bg/60 p-3 text-center text-sm">
+                  <div className="text-xs font-semibold text-mod uppercase">You asked</div>
+                  {waitingQuestion}
+                  <div className="mt-1 text-xs text-muted-foreground">Sent. The committee takes it after this turn.</div>
+                </div>
+              )}
+              {thinkingSpeaker && (
+                <p className={`text-sm italic ${SPEAKER[thinkingSpeaker].text}`}>{SPEAKER[thinkingSpeaker].name} is thinking…</p>
+              )}
+              {play.finished && brief && <ClosingCard heard={heard} briefHref={`/brief/${id}`} />}
+              {cutOff && (
+                <InterruptedCard ticker={factSheet?.ticker} company={factSheet?.company} />
+              )}
+              {play.shown.length === 0 && !play.blocked && (
+                <p className="m-auto text-sm text-muted-foreground">The committee is taking its seats…</p>
+              )}
+            </div>
+
+            {play.blocked && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/80 backdrop-blur-sm">
+                <Button size="lg" onClick={play.unblock}>
+                  <Play /> Play debate
+                </Button>
+                <p className="text-xs text-muted-foreground">Your browser needs a tap before it plays sound.</p>
+              </div>
             )}
-          </form>
-        </Card>
 
-        <SidePanel side="bear" position={positions?.bear} heard={heard} status={panelStatus("bear")} paused={play.paused} />
-      </section>
+            <form
+              className="flex flex-col gap-1.5 border-t p-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!question.trim() || reason) return;
+                interrupt(question.trim());
+                setQuestion("");
+              }}
+            >
+              <div className="flex gap-2">
+                {/* Only sending is ever blocked; the text stays editable so nothing typed gets stuck. */}
+                <Button
+                  type="submit"
+                  className="rounded-full bg-unsupported text-background hover:bg-unsupported/90"
+                  disabled={!!reason || !question.trim()}
+                >
+                  <Mic /> Interrupt
+                </Button>
+                <div className="relative flex-1">
+                  <Input
+                    autoComplete="off"
+                    className="rounded-full pr-16"
+                    placeholder={reason ? "Questions are closed" : `Ask the committee a question… (${MAX_QUESTIONS - questionsAsked} left)`}
+                    value={question}
+                    maxLength={MAX_QUESTION_CHARS}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    aria-describedby="question-status"
+                  />
+                  {question && (
+                    <span
+                      className={`pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 font-mono text-[11px] ${
+                        question.length >= MAX_QUESTION_CHARS - 30 ? "text-contested" : "text-muted-foreground"
+                      }`}
+                    >
+                      {question.length}/{MAX_QUESTION_CHARS}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {reason && (
+                <p id="question-status" role="status" className="px-2 text-xs text-muted-foreground">
+                  {reason}
+                </p>
+              )}
+            </form>
+          </Card>
 
-      {error && <p className="text-sm text-unsupported">{error}</p>}
-      <SourceSheet selected={selected} sheet={factSheet} onClose={() => setSelected(null)} />
-    </main>
+          <SidePanel side="bear" position={positions?.bear} heard={heard} status={panelStatus("bear")} paused={play.paused} />
+        </section>
+
+        {error && <p className="text-sm text-unsupported">{error}</p>}
+        <SourceSheet selected={selected} sheet={factSheet} onClose={() => setSelected(null)} />
+      </main>
+    </>
   );
 }
 

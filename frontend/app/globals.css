@@ -78,6 +78,7 @@
   --radius: 0.625rem;
 
   --bull: #1d5fe0;
+  --grid-line: rgb(15 23 42 / 5%);
   --bull-bg: #e4edff;
   --bear: #a14b06;
   --bear-bg: #fdf0e1;
@@ -109,6 +110,7 @@
   --ring: #4f8ff7;
   --radius: 0.625rem;
 
+  --grid-line: rgb(255 255 255 / 3%);
   --bull: #4f8ff7;
   --bull-bg: #1b2a44;
   --bear: #f0a04b;
@@ -124,8 +126,20 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem; /* clears the sticky header for #how links */
+  }
   body {
     @apply bg-background text-foreground;
+    /* Faint blueprint grid, as on Michael's portfolio */
+    background-image:
+      linear-gradient(90deg, transparent calc(50% - 0.5px), var(--grid-line) 50%, transparent calc(50% + 0.5px)),
+      linear-gradient(0deg, transparent calc(50% - 0.5px), var(--grid-line) 50%, transparent calc(50% + 0.5px));
+    background-size: 76px 76px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--bull) 30%, transparent);
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -183,4 +197,14 @@
   100% {
     transform: scale(1) rotate(0);
   }
+}
+
+/* Small uppercase monospace label */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }

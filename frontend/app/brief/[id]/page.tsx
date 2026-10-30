@@ -9,11 +9,7 @@ import Mascot from "@/components/debate/Mascot";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Bubble from "@/components/debate/Bubble";
-import HistoryButton from "@/components/HistoryButton";
-import Logo from "@/components/Logo";
-import NewDebateButton from "@/components/NewDebateButton";
-import SettingsSheet from "@/components/SettingsSheet";
-import { ThemeToggle } from "@/components/theme";
+import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDebate } from "@/lib/api";
@@ -207,19 +203,12 @@ export default function BriefPage() {
 
 function Shell({ id, usage, children }: { id: string; usage?: Usage | null; children: React.ReactNode }) {
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 pt-5 pb-16">
-      <header className="flex items-center justify-between gap-3">
-        <Logo />
-        <div className="flex items-center gap-1">
-          <ReplayButton id={id} variant="ghost" />
-          <NewDebateButton />
-          <HistoryButton />
-          <SettingsSheet current={usage} />
-          <ThemeToggle />
-        </div>
-      </header>
-      {children}
-    </main>
+    <>
+      <SiteHeader usage={usage} actions={<ReplayButton id={id} variant="ghost" />} />
+      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 pt-10 pb-16">
+        {children}
+      </main>
+    </>
   );
 }
 

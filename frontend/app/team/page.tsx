@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import AwardBadge from "@/components/AwardBadge";
-import Logo from "@/components/Logo";
-import NewDebateButton from "@/components/NewDebateButton";
+import SiteHeader from "@/components/SiteHeader";
 import TeamAvatar from "@/components/TeamAvatar";
-import { ThemeToggle } from "@/components/theme";
 
 export const metadata: Metadata = { title: "Team · Bull vs Bear" };
 
@@ -42,20 +40,13 @@ function LinkedInIcon() {
 
 export default function TeamPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative min-h-screen overflow-clip">
+      <SiteHeader />
       {/* Same bull-blue and bear-orange glows as the homepage hero */}
       <div aria-hidden className="pointer-events-none absolute -top-40 -left-40 size-[32rem] rounded-full bg-bull/20 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -top-24 -right-40 size-[28rem] rounded-full bg-bear/15 blur-3xl" />
 
-      <main className="relative mx-auto flex max-w-5xl flex-col gap-14 px-4 pt-6 pb-20">
-        <header className="flex items-center justify-between gap-3">
-          <Logo />
-          <div className="flex items-center gap-1">
-            <NewDebateButton />
-            <ThemeToggle />
-          </div>
-        </header>
-
+      <main className="relative mx-auto flex max-w-5xl flex-col gap-14 px-4 pt-14 pb-20">
         <section className="flex flex-col items-center gap-5 text-center">
           <AwardBadge />
           <h1 className="font-display text-4xl font-bold tracking-tight sm:text-5xl">
