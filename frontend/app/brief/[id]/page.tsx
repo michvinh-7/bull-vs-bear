@@ -9,6 +9,7 @@ import Mascot from "@/components/debate/Mascot";
 import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet";
 import { SPEAKER } from "@/components/debate/speakers";
 import Bubble from "@/components/debate/Bubble";
+import MaturityWall from "@/components/MaturityWall";
 import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +88,8 @@ export default function BriefPage() {
           ))}
         </div>
       </section>
+
+      {sheet && <MaturityWall sheet={sheet} />}
 
       {/* Agreed */}
       <Section title="Where both sides agree" description="Points neither analyst disputed.">
