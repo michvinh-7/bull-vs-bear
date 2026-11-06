@@ -11,6 +11,7 @@ import { SPEAKER } from "@/components/debate/speakers";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
+import MaturityWall from "@/components/MaturityWall";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ClaimBadge from "@/components/ClaimBadge";
@@ -240,6 +241,8 @@ export default function DebateRoom() {
 
           <SidePanel side="bear" position={positions?.bear} heard={heard} status={panelStatus("bear")} paused={play.paused} />
         </section>
+
+        {factSheet && <MaturityWall sheet={factSheet} />}
 
         {error && <p className="text-sm text-unsupported">{error}</p>}
         <SourceSheet selected={selected} sheet={factSheet} onClose={() => setSelected(null)} />
