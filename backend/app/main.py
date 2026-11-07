@@ -133,6 +133,8 @@ def start_debate(req: StartDebateRequest):
     model = req.model or config.GEMINI_MODEL
     if req.model and req.model not in usage.MODELS:
         raise HTTPException(400, f"Unknown model {req.model}. Choose one of: {', '.join(usage.MODELS)}")
+    if req.max_turns is not None and req.max_turns not in config.TURN_OPTIONS:
+        raise HTTPException(400, f"A debate can be {', '.join(map(str, config.TURN_OPTIONS))} turns long")
     key = (req.gemini_api_key or "").strip() or None
     if key and (len(key) < 20 or len(key) > 200 or any(c.isspace() for c in key)):
         raise HTTPException(400, "That doesn't look like a Gemini API key")
@@ -140,7 +142,7 @@ def start_debate(req: StartDebateRequest):
         raise HTTPException(401, NEEDS_KEY)
     if not companies.is_known(ticker):
         raise HTTPException(404, f"No public company with ticker {ticker}")
-    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=config.MAX_TURNS, model=model, usage=usage.Usage(model=model))
+    debate = Debate(id=uuid.uuid4().hex[:12], ticker=ticker, max_turns=req.max_turns or config.MAX_TURNS, model=model, usage=usage.Usage(model=model))
     store.save_debate(debate)
     _forget_stale_keys()
     if key:

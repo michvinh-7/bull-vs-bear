@@ -104,12 +104,16 @@ export interface ModelOption {
   input_per_m: number; // USD per 1M input tokens
   output_per_m: number; // USD per 1M output tokens (thinking included)
   price_note: string;
+  /** Rough Gemini cost of a debate, by number of turns ("6", "8", "12"). */
+  est_cost_usd?: Record<string, number>;
 }
 
 export interface ModelsResponse {
   default: string;
   prices_checked: string; // date the prices were copied from Google's pricing page
   requires_user_key?: boolean; // debates need the visitor's own Gemini key (the team key is off limits)
+  default_turns?: number; // analyst lines in a debate unless the visitor picks another length
+  turn_options?: number[]; // debate lengths a visitor may pick
   models: ModelOption[];
 }
 

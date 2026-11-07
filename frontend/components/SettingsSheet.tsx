@@ -12,15 +12,17 @@ import {
   formatTokens,
   formatUsd,
   getApiKey,
+  LENGTH_NAMES,
   looksLikeKey,
   priceLine,
   resetTotals,
   setApiKey,
   setModel,
+  setTurns,
   useSettings,
   type Totals,
 } from "@/lib/settings";
-import type { ModelsResponse, Usage } from "@/lib/types";
+import type { ModelOption, ModelsResponse, Usage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Gear button + drawer: Gemini model, the user's own API key, and token/cost usage. */
@@ -51,7 +53,7 @@ export default function SettingsSheet({ current }: { current?: Usage | null }) {
       <SheetContent side={mobile ? "bottom" : "right"} className="max-h-[90vh] gap-0 overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>Model and key apply to the next debate you start.</SheetDescription>
+          <SheetDescription>Model, length and key apply to the next debate you start.</SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col gap-8 px-4 pb-8">
@@ -95,6 +97,17 @@ export default function SettingsSheet({ current }: { current?: Usage | null }) {
             )}
           </Section>
 
+          {/* Debate length */}
+          {models?.turn_options && models.turn_options.length > 1 && (
+            <Section title="Debate length">
+              <LengthPicker
+                options={models.turn_options}
+                selected={settings.turns && models.turn_options.includes(settings.turns) ? settings.turns : (models.default_turns ?? 8)}
+                model={selectedModel}
+              />
+            </Section>
+          )}
+
           {/* API key */}
           <Section title="Your Gemini API key" optional={!keyRequired}>
             <KeyField hasKey={settings.hasKey} required={keyRequired} />
@@ -126,6 +139,45 @@ function Section({ title, optional, children }: { title: string; optional?: bool
       </h3>
       {children}
     </section>
+  );
+}
+
+/** Quick / Standard / Deep, each with a rough cost on the selected model. */
+function LengthPicker({ options, selected, model }: { options: number[]; selected: number; model?: ModelOption }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div role="radiogroup" aria-label="Debate length" className="grid grid-cols-3 gap-2">
+        {options.map((t) => {
+          const on = t === selected;
+          const name = LENGTH_NAMES[t];
+          const cost = model?.est_cost_usd?.[String(t)];
+          return (
+            <button
+              key={t}
+              role="radio"
+              aria-checked={on}
+              onClick={() => setTurns(t)}
+              title={name?.note}
+              className={cn(
+                "flex flex-col items-start gap-0.5 rounded-lg border p-3 text-left transition hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden",
+                on && "border-foreground/40 bg-accent",
+              )}
+            >
+              <span className="flex w-full items-center justify-between gap-1 text-sm font-medium">
+                {name?.label ?? `${t} turns`}
+                {on && <Check className="size-3.5" />}
+              </span>
+              <span className="text-xs text-muted-foreground">{t} turns</span>
+              {cost != null && <span className="font-mono text-[11px] text-muted-foreground">≈ {formatUsd(cost)}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Turns are the analysts’ lines; the moderator’s halfway question and your questions come on top.
+        {model ? ` Costs are rough Gemini estimates on ${model.label}, from recorded debates.` : ""} Voice isn’t included.
+      </p>
+    </div>
   );
 }
 

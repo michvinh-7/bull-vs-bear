@@ -36,6 +36,8 @@ FRONTEND_ORIGIN = _env("FRONTEND_ORIGIN", "http://localhost:3000")
 VOICE_ENABLED = _env("VOICE_ENABLED", "false").lower() == "true"
 
 MAX_TURNS = int(_env("MAX_TURNS", "8"))  # bull + bear lines, not counting moderator or interrupts
+# Debate lengths a visitor can pick in Settings (analyst lines). The default above is always allowed.
+TURN_OPTIONS = sorted({6, 8, 12, MAX_TURNS})
 
 # Off switch for the NLI fact-checker (e.g. if it runs the server out of memory): labels stay "pending".
 FACT_CHECK = _env("FACT_CHECK", "true").lower() == "true"

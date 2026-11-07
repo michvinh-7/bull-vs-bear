@@ -40,4 +40,19 @@ describe("startDebate", () => {
       gemini_api_key: "AIzaUserOwnKey_0123456789abcdef",
     });
   });
+
+  it("sends the chosen debate length as max_turns", async () => {
+    const { startDebate } = await import("@/lib/api");
+    const calls: RequestInit[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (_: unknown, init?: RequestInit) => (calls.push(init!), ok())) as typeof fetch;
+    try {
+      await startDebate("vz", { turns: 12 });
+      await startDebate("vz", { turns: null });
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(JSON.parse(calls[0].body as string)).toEqual({ ticker: "vz", max_turns: 12 });
+    expect(JSON.parse(calls[1].body as string)).toEqual({ ticker: "vz" });
+  });
 });

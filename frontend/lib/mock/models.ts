@@ -4,10 +4,12 @@ import type { ModelsResponse, Usage } from "../types";
 export const mockModels: ModelsResponse = {
   default: "gemini-3.6-flash",
   prices_checked: "2026-10-10",
+  default_turns: 8,
+  turn_options: [6, 8, 12],
   models: [
-    { id: "gemini-3.6-flash", label: "Flash", note: "Balanced speed and quality. Recommended.", input_per_m: 0.75, output_per_m: 3.75, price_note: "Introductory price through Dec 31, 2026 ($1.50 / $7.50 after)." },
-    { id: "gemini-3.5-flash-lite", label: "Flash-Lite", note: "Fastest and cheapest. Shorter, simpler arguments.", input_per_m: 0.3, output_per_m: 2.5, price_note: "" },
-    { id: "gemini-3.1-pro-preview", label: "Pro (preview)", note: "Most capable, but slower. Needs an API key with Pro access.", input_per_m: 2, output_per_m: 12, price_note: "Prompts up to 200k tokens." },
+    { id: "gemini-3.6-flash", label: "Flash", note: "Balanced speed and quality. Recommended.", input_per_m: 0.75, output_per_m: 3.75, price_note: "Introductory price through Dec 31, 2026 ($1.50 / $7.50 after).", est_cost_usd: { "6": 0.0481, "8": 0.0642, "12": 0.0963 } },
+    { id: "gemini-3.5-flash-lite", label: "Flash-Lite", note: "Fastest and cheapest. Shorter, simpler arguments.", input_per_m: 0.3, output_per_m: 2.5, price_note: "", est_cost_usd: { "6": 0.0229, "8": 0.0305, "12": 0.0457 } },
+    { id: "gemini-3.1-pro-preview", label: "Pro (preview)", note: "Most capable, but slower. Needs an API key with Pro access.", input_per_m: 2, output_per_m: 12, price_note: "Prompts up to 200k tokens.", est_cost_usd: { "6": 0.1356, "8": 0.1808, "12": 0.2712 } },
   ],
 };
 
