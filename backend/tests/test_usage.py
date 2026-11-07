@@ -259,3 +259,20 @@ def test_a_users_key_is_not_kept_after_their_debate(monkeypatch):
 ])
 def test_key_rejected(error, rejected):
     assert agents.key_rejected(error) is rejected
+
+
+def test_models_lists_debate_lengths_with_cost_estimates(client):
+    body = client.get("/models").json()
+    assert body["default_turns"] == config.MAX_TURNS
+    assert body["turn_options"] == config.TURN_OPTIONS and {6, 8, 12} <= set(body["turn_options"])
+    for m in body["models"]:
+        est = m["est_cost_usd"]
+        assert list(est) == [str(t) for t in config.TURN_OPTIONS]
+        assert est["6"] < est["8"] < est["12"]
+
+
+def test_cost_estimate_matches_a_recorded_flash_debate():
+    # The recorded 8-line VZ debate on Flash cost $0.063.
+    assert abs(usage.estimate_cost("gemini-3.6-flash", 8) - 0.063) < 0.01
+    assert usage.estimate_cost("gemini-3.5-flash-lite", 8) < usage.estimate_cost("gemini-3.6-flash", 8)
+    assert usage.estimate_cost("not-a-model", 8) is None

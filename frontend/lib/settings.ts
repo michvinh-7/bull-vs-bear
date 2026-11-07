@@ -14,6 +14,7 @@ import type { ModelOption, Usage } from "./types";
  */
 
 const MODEL_KEY = "bvb-model";
+const TURNS_KEY = "bvb-turns";
 const API_KEY = "bvb-gemini-key";
 const TOTALS_KEY = "bvb-usage-total";
 const COUNTED_KEY = "bvb-usage-counted"; // debate ids already added, so a replay never double-counts
@@ -64,6 +65,22 @@ export function getModel(): string | null {
 export function setModel(id: string) {
   write("local", MODEL_KEY, id);
 }
+
+/** The debate length the visitor picked, or null for the server default. */
+export function getTurns(): number | null {
+  const n = Number(read("local", TURNS_KEY));
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+export function setTurns(n: number) {
+  write("local", TURNS_KEY, String(n));
+}
+
+/** Names for the lengths Settings offers; any other length is shown as its number of turns. */
+export const LENGTH_NAMES: Record<number, { label: string; note: string }> = {
+  6: { label: "Quick", note: "The main points, fastest" },
+  8: { label: "Standard", note: "Room for rebuttals" },
+  12: { label: "Deep", note: "More ground covered, more back-and-forth" },
+};
 
 export function getApiKey(): string | null {
   return read("session", API_KEY);
@@ -116,8 +133,11 @@ export function resetTotals() {
 
 /** Live view of the settings; every component using it updates together. */
 export function useSettings() {
-  const [state, setState] = useState({ model: null as string | null, hasKey: false, totals: EMPTY_TOTALS });
-  const refresh = useCallback(() => setState({ model: getModel(), hasKey: !!getApiKey(), totals: getTotals() }), []);
+  const [state, setState] = useState({ model: null as string | null, turns: null as number | null, hasKey: false, totals: EMPTY_TOTALS });
+  const refresh = useCallback(
+    () => setState({ model: getModel(), turns: getTurns(), hasKey: !!getApiKey(), totals: getTotals() }),
+    [],
+  );
   useEffect(() => {
     refresh();
     window.addEventListener(EVENT, refresh);

@@ -157,6 +157,7 @@ DISCLAIMER = "This summarizes the debate. It is not investment advice."
 class StartDebateRequest(BaseModel):
     ticker: str
     model: str | None = None  # one of usage.MODELS; server default if omitted
+    max_turns: int | None = None  # one of config.TURN_OPTIONS; server default if omitted
     # The user's own Gemini key (Settings). Held in memory for this debate only; never stored or echoed.
     gemini_api_key: str | None = Field(None, repr=False)
 

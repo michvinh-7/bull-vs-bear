@@ -12,6 +12,9 @@ import {
   resetTotals,
   setApiKey,
   setModel,
+  getTurns,
+  LENGTH_NAMES,
+  setTurns,
 } from "@/lib/settings";
 import { mockModels, mockUsage } from "@/lib/mock/models";
 import type { Usage } from "@/lib/types";
@@ -24,6 +27,29 @@ const usage = (over: Partial<Usage> = {}): Usage => ({
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+});
+
+describe("debate length", () => {
+  it("is unset until picked, then remembered in this browser", () => {
+    expect(getTurns()).toBeNull();
+    setTurns(12);
+    expect(getTurns()).toBe(12);
+    expect(localStorage.getItem("bvb-turns")).toBe("12");
+  });
+
+  it("ignores junk in storage", () => {
+    localStorage.setItem("bvb-turns", "lots");
+    expect(getTurns()).toBeNull();
+  });
+
+  it("names every length the mock server offers, with an estimate per model", () => {
+    for (const t of mockModels.turn_options!) expect(LENGTH_NAMES[t]).toBeDefined();
+    for (const m of mockModels.models) {
+      const est = m.est_cost_usd!;
+      expect(est["6"]).toBeLessThan(est["8"]);
+      expect(est["8"]).toBeLessThan(est["12"]);
+    }
+  });
 });
 
 describe("model and key storage", () => {

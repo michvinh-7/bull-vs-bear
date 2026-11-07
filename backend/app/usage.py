@@ -138,11 +138,36 @@ def record_voice(text: str) -> None:
         ctx.usage.add_voice(len(text))
 
 
+# Tokens per analyst line, everything included (positions, the halfway question, fact-check
+# retries, the brief), from the recorded VZ and AMC debates: 8 lines on Flash, 15-16 calls,
+# 57-65k input and 4-5.5k output + thinking tokens in all. Input grows as the transcript does,
+# so long debates run a little over this and short ones a little under.
+EST_INPUT_PER_TURN = 7_700
+EST_OUTPUT_PER_TURN = 600
+
+
+def estimate_cost(model: str, turns: int) -> float | None:
+    """Rough Gemini cost of a debate of `turns` analyst lines, for the Settings picker."""
+    price = MODELS.get(resolve(model))
+    if price is None:
+        return None
+    return turns * (EST_INPUT_PER_TURN * price["input_per_m"] + EST_OUTPUT_PER_TURN * price["output_per_m"]) / 1e6
+
+
 def models_payload() -> dict:
-    """What GET /models returns: the picker's options and where the prices came from."""
+    """What GET /models returns: the picker's options, debate lengths, and where the prices came from."""
     return {
         "default": DEFAULT_MODEL,
         "prices_checked": PRICES_CHECKED,
         "requires_user_key": config.REQUIRE_USER_KEY,
-        "models": [{"id": mid, **{k: v for k, v in m.items() if k != "min_thinking"}} for mid, m in MODELS.items()],
+        "default_turns": config.MAX_TURNS,
+        "turn_options": config.TURN_OPTIONS,
+        "models": [
+            {
+                "id": mid,
+                **{k: v for k, v in m.items() if k != "min_thinking"},
+                "est_cost_usd": {str(t): round(estimate_cost(mid, t), 4) for t in config.TURN_OPTIONS},
+            }
+            for mid, m in MODELS.items()
+        ],
     }

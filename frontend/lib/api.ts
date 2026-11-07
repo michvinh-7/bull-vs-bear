@@ -21,6 +21,7 @@ export async function errorFrom(res: Response, fallback: string): Promise<Error>
 
 export interface StartOptions {
   model?: string | null; // a ModelOption id; server default if omitted
+  turns?: number | null; // debate length (analyst lines); server default if omitted
   apiKey?: string | null; // the user's own Gemini key, sent only to our backend
 }
 
@@ -36,6 +37,7 @@ export async function startDebate(ticker: string, opts: StartOptions = {}): Prom
     body: JSON.stringify({
       ticker,
       ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.turns ? { max_turns: opts.turns } : {}),
       ...(opts.apiKey ? { gemini_api_key: opts.apiKey } : {}),
     }),
   });

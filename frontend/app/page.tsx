@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getModels, startDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
-import { getApiKey, getModel, useSettings } from "@/lib/settings";
+import { getApiKey, getModel, getTurns, useSettings } from "@/lib/settings";
 import { getCompanies, MOCK_COMPANIES, type DemoCompany } from "@/lib/companies";
 import type { Label } from "@/lib/types";
 
@@ -43,7 +43,7 @@ export default function Home() {
     unlockAudio(); // must run inside the click, before any await
     setStarting(t.trim().toUpperCase());
     try {
-      const id = await startDebate(t.trim(), { model: getModel(), apiKey: getApiKey() });
+      const id = await startDebate(t.trim(), { model: getModel(), turns: getTurns(), apiKey: getApiKey() });
       router.push(`/debate/${id}`);
     } catch (e) {
       toast.error("Couldn’t start the debate", { description: (e as Error).message });

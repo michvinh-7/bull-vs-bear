@@ -148,3 +148,20 @@ def test_saved_fact_sheet_is_used_instead_of_rebuilding(client, monkeypatch):
     with client.websocket_connect("/ws/debates/c1") as ws:
         msg = ws.receive_json()
         assert msg["type"] == "fact_sheet" and msg["data"]["ticker"] == "VZ"
+
+
+def test_start_debate_with_a_chosen_length(client):
+    r = client.post("/debates", json={"ticker": "VZ", "max_turns": 12})
+    assert r.status_code == 200
+    assert client.get(f"/debates/{r.json()['debate_id']}").json()["max_turns"] == 12
+
+
+def test_start_debate_defaults_to_the_configured_length(client):
+    r = client.post("/debates", json={"ticker": "VZ"})
+    assert client.get(f"/debates/{r.json()['debate_id']}").json()["max_turns"] == config.MAX_TURNS
+
+
+def test_start_debate_rejects_lengths_not_offered(client):
+    for turns in (0, 7, 50):
+        r = client.post("/debates", json={"ticker": "VZ", "max_turns": turns})
+        assert r.status_code == 400 and "turns long" in r.json()["detail"]
