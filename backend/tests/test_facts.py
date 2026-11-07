@@ -60,6 +60,27 @@ def test_sources_and_metrics():
     assert (m["liquidity_usd"].value, m["liquidity_usd"].source_ids) == (31_048e6, ["S1", "S3"])
 
 
+def test_full_maturity_schedule_is_on_the_sheet():
+    # VZ's debt table lists $16.5 billion of instruments, but the maturity schedule covers it all
+    sheet = facts.fact_sheet_from("VZ", FACTS, pulled(), URL)
+    assert [(m.year, m.amount_usd) for m in sheet.maturities] == [(2026, 17_267e6), (2027, 9_569e6), (2028, 13_032e6)]
+    assert sheet.maturities_thereafter_usd == 96_753e6
+    # from XBRL, so it cites the statements source, which says the schedule in words
+    source = sheet.source(sheet.maturities_source_id)
+    assert source.label == "10-K · Financial statements" and "$17.3 billion in 2026" in source.excerpt
+
+
+def test_maturity_schedule_read_from_the_10k_cites_its_table():
+    table = Excerpt("Long-Term Debt Maturities\n2026 | $ | 88\n2027 | 1,200", "92")
+    sheet = facts.fact_sheet_from("VZ", FACTS, pulled(excerpts={"maturities": table, "maturities_after_year_five": table}), URL)
+    assert sheet.source(sheet.maturities_source_id).label == "10-K · p. 92"
+
+
+def test_no_maturity_schedule_leaves_it_empty():
+    sheet = facts.fact_sheet_from("VZ", FACTS, pulled(fields={"maturities": {}}), URL)
+    assert (sheet.maturities, sheet.maturities_thereafter_usd, sheet.maturities_source_id) == ([], None, None)
+
+
 def test_debaters_can_quote_every_number_in_the_sheet():
     sheet = facts.fact_sheet_from("VZ", FACTS, pulled(), URL)
     said = agents._number_text(sheet)

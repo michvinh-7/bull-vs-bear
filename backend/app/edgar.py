@@ -369,6 +369,9 @@ def maturities_after_year_five(facts: dict, end: str, years_one_to_five: dict[in
     # boeing, HCA, nextera tag years 1-5 but not the rest: it's whatever debt is left
     if years_one_to_five and debt and debt > sum(years_one_to_five.values()):
         return debt - sum(years_one_to_five.values()), ["total debt minus years 1-5"]
+    # AMC: years 1-5 already add up to all of the debt, so nothing is left for later
+    if years_one_to_five and debt:
+        return 0.0, ["years 1-5 cover total debt"]
     return None, []
 
 
@@ -426,6 +429,9 @@ def pull_fields(facts: dict, text: str | None = None) -> dict:
         if not fields["maturities"]:
             table, after, ex = filing.debt_maturities(text, fy, fields["total_debt"])
             if table:
+                # a table with no "thereafter" row that still adds up to total debt covers all of it
+                if after is None and fields["total_debt"]:
+                    after = 0.0
                 fields["maturities"], excerpts["maturities"] = table, ex
                 fields["maturities_after_year_five"], tags["maturities_after_year_five"] = after, []
                 excerpts["maturities_after_year_five"] = ex

@@ -53,6 +53,25 @@
       "title": "DebtInstrument",
       "type": "object"
     },
+    "Maturity": {
+      "properties": {
+        "year": {
+          "title": "Year",
+          "type": "integer"
+        },
+        "amount_usd": {
+          "description": "Principal due that year, from the 10-K's debt maturity table",
+          "title": "Amount Usd",
+          "type": "number"
+        }
+      },
+      "required": [
+        "year",
+        "amount_usd"
+      ],
+      "title": "Maturity",
+      "type": "object"
+    },
     "Metric": {
       "properties": {
         "name": {
@@ -176,11 +195,46 @@
       "type": "array"
     },
     "debt": {
+      "description": "The largest instruments, read by Gemini; may not list every loan. See maturities for the full schedule",
       "items": {
         "$ref": "#/$defs/DebtInstrument"
       },
       "title": "Debt",
       "type": "array"
+    },
+    "maturities": {
+      "description": "All debt principal due by year (usually the next five), from the 10-K's maturity table. Empty if the 10-K has none we could read",
+      "items": {
+        "$ref": "#/$defs/Maturity"
+      },
+      "title": "Maturities",
+      "type": "array"
+    },
+    "maturities_thereafter_usd": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Principal due after the last year in maturities, lumped together. Set only when the schedule covers all the debt",
+      "title": "Maturities Thereafter Usd"
+    },
+    "maturities_source_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The source the maturity schedule came from",
+      "title": "Maturities Source Id"
     },
     "notices": {
       "description": "Plain-English notes for the debate page when part of the data couldn't be fetched, e.g. older news or EDGAR being down",

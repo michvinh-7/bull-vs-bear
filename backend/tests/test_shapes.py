@@ -35,6 +35,8 @@ def test_example_ids_resolve():
         assert set(m.source_ids) <= source_ids, m.name
     for d in sheet.debt:
         assert d.source_id in source_ids, d.name
+    if sheet.maturities:
+        assert sheet.maturities_source_id in source_ids
     for side in (positions.bull, positions.bear):
         assert {p.source_id for p in side.points} - {None} <= source_ids
     for line in lines:

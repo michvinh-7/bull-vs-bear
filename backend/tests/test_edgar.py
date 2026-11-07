@@ -157,6 +157,38 @@ def test_missing_xbrl_pieces_fall_back():
     assert f["maturities_after_year_five"] == 400
 
 
+def test_nothing_after_year_five_when_years_one_to_five_cover_the_debt():
+    # AMC tags years 1-5 and no "after year five"; together they're all of its debt
+    amc = facts(
+        NetIncomeLoss=[year(600)],
+        LongTermDebt=[snap(1_000)],
+        LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths=[snap(20)],
+        LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree=[snap(1_010)],
+    )
+    f = edgar.pull_fields(amc)["fields"]
+    assert f["maturities"] == {2027: 20, 2029: 1_010}
+    assert f["maturities_after_year_five"] == 0
+
+
+def test_maturity_table_read_from_the_text():
+    no_tags = facts(NetIncomeLoss=[year(600)], LongTermDebt=[snap(1_000_000_000)])
+    text = "\n".join([
+        "[page 90]",
+        "Debt Maturities",
+        "Principal of our long-term debt matures as follows:",
+        "| (Dollars in millions)",
+        "2027 | $ | 100",
+        "2028 | 200",
+        "2029 | 300",
+        "2030 | 400",
+    ])
+    out = edgar.pull_fields(no_tags, text)
+    f = out["fields"]
+    assert f["maturities"] == {2027: 100e6, 2028: 200e6, 2029: 300e6, 2030: 400e6}
+    # no "thereafter" row, but the table adds up to total debt, so nothing is due later
+    assert f["maturities_after_year_five"] == 0 and out["excerpts"]["maturities"].page == "90"
+
+
 def test_short_term_borrowings_alone_arent_total_debt():
     only_cp = facts(NetIncomeLoss=[year(600)], CommercialPaper=[snap(500)])
     assert edgar.total_debt(only_cp, "2026-01-31") == (None, [])
