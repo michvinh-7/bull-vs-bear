@@ -10,7 +10,14 @@ const sans = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 
+// Absolute base for link-preview URLs (og:image). Set NEXT_PUBLIC_SITE_URL to the public domain;
+// on Vercel the production domain is used automatically.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Bull vs Bear",
   description: "AI credit committee. Most AI tells you what to think; ours shows you what to check.",
 };

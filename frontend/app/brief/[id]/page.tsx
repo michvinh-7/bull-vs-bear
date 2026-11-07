@@ -10,11 +10,13 @@ import SourceSheet, { type SelectedClaim } from "@/components/debate/SourceSheet
 import { SPEAKER } from "@/components/debate/speakers";
 import Bubble from "@/components/debate/Bubble";
 import MaturityWall from "@/components/MaturityWall";
+import ShareBar from "@/components/ShareBar";
 import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDebate } from "@/lib/api";
 import { unlockAudio } from "@/lib/audio";
+import { claimCounts } from "@/lib/briefExport";
 import { findSource } from "@/lib/format";
 import { DISCLAIMER, type Claim, type Debate, type Label, type Side, type Speaker, type Usage } from "@/lib/types";
 
@@ -62,8 +64,7 @@ export default function BriefPage() {
   const find = (ids: string[]) => ids.map((i) => byId.get(i)).filter((f): f is Found => !!f);
   const open = (f: Found) => setSelected(f);
 
-  const all = debate.lines.filter((l) => l.speaker !== "moderator").flatMap((l) => l.claims);
-  const count = (label: Label) => all.filter((c) => c.label === label).length;
+  const counts = claimCounts(debate);
 
   return (
     <Shell id={id} usage={debate.usage}>
@@ -79,14 +80,15 @@ export default function BriefPage() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          {all.length} claims checked:
+          {counts.total} claims checked:
           {(["verified", "contested", "unsupported"] as const).map((l) => (
             <span key={l} className="flex items-center gap-1">
-              <span className="font-mono text-foreground">{count(l)}</span>
+              <span className="font-mono text-foreground">{counts[l]}</span>
               <ClaimBadge label={l} />
             </span>
           ))}
         </div>
+        <ShareBar debate={debate} />
       </section>
 
       {sheet && <MaturityWall sheet={sheet} />}
@@ -184,12 +186,15 @@ export default function BriefPage() {
       </Section>
 
       {/* The whole debate as text, at once: no waiting for playback */}
-      <Transcript debate={debate} onClaim={(claim, line) => open({ claim, speaker: line.speaker })} />
+      <div className="print:hidden">
+        <Transcript debate={debate} onClaim={(claim, line) => open({ claim, speaker: line.speaker })} />
+      </div>
 
       {/* Footer */}
       <section className="flex flex-col items-center gap-4 border-t pt-6 text-center">
         <p className="text-sm text-muted-foreground">{DISCLAIMER}</p>
-        <div className="flex flex-wrap justify-center gap-2">
+        <PrintSource />
+        <div className="flex flex-wrap justify-center gap-2 print:hidden">
           <ReplayButton id={id} />
           <Button asChild variant="outline">
             <Link href="/">
@@ -207,12 +212,21 @@ export default function BriefPage() {
 function Shell({ id, usage, children }: { id: string; usage?: Usage | null; children: React.ReactNode }) {
   return (
     <>
-      <SiteHeader usage={usage} actions={<ReplayButton id={id} variant="ghost" />} />
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 pt-10 pb-16">
+      <div className="contents print:hidden">
+        <SiteHeader usage={usage} actions={<ReplayButton id={id} variant="ghost" />} />
+      </div>
+      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 pt-10 pb-16 print:max-w-none print:gap-5 print:p-0">
         {children}
       </main>
     </>
   );
+}
+
+/** On paper, say where the brief came from so a reader can open the live version. */
+function PrintSource() {
+  const [url, setUrl] = useState("");
+  useEffect(() => setUrl(window.location.href.split(/[?#]/)[0]), []);
+  return <p className="hidden font-mono text-xs text-muted-foreground print:block">Bull vs Bear · {url}</p>;
 }
 
 /** Replays the saved debate. The click also unlocks audio for the replay. */
