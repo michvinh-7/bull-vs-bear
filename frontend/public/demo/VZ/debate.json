@@ -252,7 +252,31 @@
         "source_id": "S11"
       }
     ],
-    "notices": []
+    "notices": [],
+    "maturities": [
+      {
+        "year": 2026,
+        "amount_usd": 17267000000
+      },
+      {
+        "year": 2027,
+        "amount_usd": 9569000000
+      },
+      {
+        "year": 2028,
+        "amount_usd": 13032000000
+      },
+      {
+        "year": 2029,
+        "amount_usd": 8115000000
+      },
+      {
+        "year": 2030,
+        "amount_usd": 11081000000
+      }
+    ],
+    "maturities_thereafter_usd": 96753000000.0,
+    "maturities_source_id": "S3"
   },
   "positions": {
     "bull": {

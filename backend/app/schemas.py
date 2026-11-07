@@ -44,13 +44,32 @@ class DebtInstrument(BaseModel):
     source_id: str
 
 
+class Maturity(BaseModel):
+    year: int
+    amount_usd: float = Field(description="Principal due that year, from the 10-K's debt maturity table")
+
+
 class FactSheet(BaseModel):
     company: str
     ticker: str
     as_of: str = Field(description='Fiscal period of the latest filing, e.g. "FY2025" or "Q2 2026"')
     sources: list[Source] = Field(default_factory=list)
     metrics: list[Metric] = Field(default_factory=list)
-    debt: list[DebtInstrument] = Field(default_factory=list)
+    debt: list[DebtInstrument] = Field(
+        default_factory=list,
+        description="The largest instruments, read by Gemini; may not list every loan. See maturities for the full schedule",
+    )
+    maturities: list[Maturity] = Field(
+        default_factory=list,
+        description="All debt principal due by year (usually the next five), from the 10-K's maturity table. "
+                    "Empty if the 10-K has none we could read",
+    )
+    maturities_thereafter_usd: float | None = Field(
+        None,
+        description="Principal due after the last year in maturities, lumped together. "
+                    "Set only when the schedule covers all the debt",
+    )
+    maturities_source_id: str | None = Field(None, description="The source the maturity schedule came from")
     notices: list[str] = Field(
         default_factory=list,
         description="Plain-English notes for the debate page when part of the data couldn't be fetched, "

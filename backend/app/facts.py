@@ -15,7 +15,7 @@ import httpx
 
 from . import agents, companies, edgar, metrics, research, store
 from .agents import money
-from .schemas import DebtInstrument, FactSheet, Metric, Source
+from .schemas import DebtInstrument, FactSheet, Maturity, Metric, Source
 
 APP = Path(__file__).resolve().parent
 EXAMPLE = APP / "examples" / "fact_sheet.json"  # copy of shared/examples
@@ -195,12 +195,16 @@ def fact_sheet_from(ticker: str, facts: dict, pulled: dict, url: str) -> FactShe
     def cite(*names: str) -> list[str]:
         return sorted({from_text.get(n, statements) for n in names})
 
+    schedule = sorted(f["maturities"].items())
     return FactSheet(
         company=_company_name(ticker, facts),
         ticker=ticker,
         as_of=_fiscal_label(end),
         sources=sources,
         metrics=_metrics(f, cite),
+        maturities=[Maturity(year=y, amount_usd=v) for y, v in schedule],
+        maturities_thereafter_usd=f.get("maturities_after_year_five") if schedule else None,
+        maturities_source_id=cite("maturities")[0] if schedule else None,
     )
 
 

@@ -34,13 +34,24 @@ export interface DebtInstrument {
   source_id: string;
 }
 
+export interface Maturity {
+  year: number;
+  amount_usd: number;
+}
+
 export interface FactSheet {
   company: string;
   ticker: string;
   as_of: string;
   sources: Source[];
   metrics: Metric[];
+  /** The largest instruments, read by Gemini; may not list every loan. */
   debt: DebtInstrument[];
+  /** All debt principal due by year (usually the next five), from the 10-K's maturity table. */
+  maturities?: Maturity[];
+  /** Principal due after the last year in `maturities`. Set only when the schedule covers all the debt. */
+  maturities_thereafter_usd?: number | null;
+  maturities_source_id?: string | null;
   /** Plain-English notes when part of the data couldn't be fetched, e.g. older news or EDGAR being down. */
   notices?: string[];
 }

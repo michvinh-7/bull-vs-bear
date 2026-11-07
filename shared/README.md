@@ -20,7 +20,7 @@ To change a shape:
 ## How ids connect everything
 
 ```
-fact_sheet.sources[].id  ("S3")  <── metrics[].source_ids, debt[].source_id,
+fact_sheet.sources[].id  ("S3")  <── metrics[].source_ids, debt[].source_id, maturities_source_id,
                                      positions.*.points[].source_id, claims[].source_id
 claims[].id  ("t2c1")            <── brief.agreed[].claim_ids, disputed[].claim_ids, unsupported[].claim_id
 ```

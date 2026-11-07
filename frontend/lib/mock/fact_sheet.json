@@ -127,5 +127,29 @@
       "maturity_year": 2030,
       "source_id": "S2"
     }
-  ]
+  ],
+  "maturities": [
+    {
+      "year": 2026,
+      "amount_usd": 0
+    },
+    {
+      "year": 2027,
+      "amount_usd": 0
+    },
+    {
+      "year": 2028,
+      "amount_usd": 416000000
+    },
+    {
+      "year": 2029,
+      "amount_usd": 700000000
+    },
+    {
+      "year": 2030,
+      "amount_usd": 684000000
+    }
+  ],
+  "maturities_thereafter_usd": 0,
+  "maturities_source_id": "S2"
 }
