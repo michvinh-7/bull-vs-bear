@@ -28,6 +28,7 @@ const NAV = [
   { href: "/#how", label: "How it works" },
   { href: "/history", label: "History" },
   { href: "/journey", label: "Journey" },
+  { href: "/roadmap", label: "Roadmap" },
   { href: "/team", label: "Team" },
 ];
 
