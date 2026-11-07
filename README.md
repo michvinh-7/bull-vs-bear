@@ -69,7 +69,7 @@ Set `NEXT_PUBLIC_USE_MOCK=false` to talk to the real backend.
 | GET | `/companies` | pre-cached demo companies |
 | GET | `/companies/search?q=` | up to 10 matching companies |
 | GET | `/models` | Gemini models the user can pick, with prices |
-| POST | `/debates` `{ticker, model?, gemini_api_key?}` | `{debate_id}` |
+| POST | `/debates` `{ticker, model?, max_turns?, gemini_api_key?}` | `{debate_id}` |
 | GET | `/debates/{id}` | full debate for replay, including `model` and `usage` |
 | GET | `/debates/{id}/brief` | committee brief |
 | WS | `/ws/debates/{id}` | streams `fact_sheet`, `positions`, `turn_start` + `line` per turn, `usage`, `brief`; accepts `interrupt` and `played` |
@@ -80,6 +80,8 @@ The gear icon on every page opens Settings.
 
 - **Gemini model.** Flash (default), Flash-Lite or Pro, listed by `GET /models` with prices. Applies to the next debate.
   Pro needs a key with Pro access and is slow (about 45 s to the first line), so use Flash for live demos.
+- **Debate length.** Quick (6 turns), Standard (8, the default, `MAX_TURNS`) or Deep (12), from `turn_options` in
+  `GET /models`, with a rough cost per model (`est_cost_usd`, from tokens per turn in recorded debates; see `usage.py`).
 - **Your own Gemini API key** (optional). The browser keeps it in `sessionStorage` (this tab only) and sends it
   only to our backend with `POST /debates`. The backend holds it in memory for that one debate and drops it when
   the debate ends; it's never saved, logged or returned. ElevenLabs voices still use the team's key.
