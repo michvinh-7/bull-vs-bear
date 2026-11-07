@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, FileText, Search } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, FileText, Search } from "lucide-react";
 import ClaimBadge from "@/components/ClaimBadge";
 import { Badge } from "@/components/ui/badge";
 import SiteHeader from "@/components/SiteHeader";
@@ -43,11 +43,20 @@ export default function HistoryPage() {
     <>
       <SiteHeader />
       <main className="mx-auto flex max-w-4xl flex-col gap-8 px-4 pt-10 pb-16">
-        <section className="flex flex-col gap-2">
-          <h1 className="font-display text-3xl font-bold tracking-tight">Past debates</h1>
-          <p className="text-sm text-muted-foreground">
-            Every finished debate with a committee brief. Open one to read its brief and full transcript right away, or replay it.
-          </p>
+        <section className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <h1 className="font-display text-3xl font-bold tracking-tight">Past debates</h1>
+            <p className="text-sm text-muted-foreground">
+              Every finished debate with a committee brief. Open one to read its brief and full transcript right away, or replay it.
+            </p>
+          </div>
+          {rows && rows.length >= 2 && (
+            <Button asChild variant="outline">
+              <Link href="/compare">
+                <ArrowLeftRight /> Compare two
+              </Link>
+            </Button>
+          )}
         </section>
 
         {/* Open any debate by its id (or a pasted link) */}
