@@ -1,5 +1,23 @@
 import type { Metadata } from "next";
-import { BookOpen, CalendarRange, FileStack, FlaskConical, Mail, ScanSearch, Tags } from "lucide-react";
+import {
+  ArrowLeftRight,
+  AudioLines,
+  BookOpen,
+  Calculator,
+  CalendarRange,
+  ChartColumn,
+  FileStack,
+  FileText,
+  FlaskConical,
+  History,
+  Mail,
+  MessageCircleQuestion,
+  ScanSearch,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Tags,
+} from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,11 +27,67 @@ export const metadata: Metadata = { title: "Roadmap · Bull vs Bear" };
 
 const CONTACT = `mailto:michvinh@gmail.com?subject=${encodeURIComponent("Bull vs Bear: helping with the evaluation")}`;
 
+/** What someone can do on the site today. */
+const AVAILABLE: { icon: typeof BookOpen; title: string; text: string }[] = [
+  {
+    icon: Search,
+    title: "Debate a US-listed company",
+    text: "Search by name or ticker for any company that files a 10-K (banks aside), or start with a demo company.",
+  },
+  {
+    icon: Calculator,
+    title: "A fact sheet built from the filings",
+    text: "The latest 10-K from SEC EDGAR plus recent news. Python, not AI, computes leverage, coverage and liquidity.",
+  },
+  {
+    icon: AudioLines,
+    title: "A spoken debate",
+    text: "The Bull and the Bear argue out loud in their own voices, and every claim cites the passage it relies on.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Every claim fact-checked",
+    text: "An independent model labels each claim verified, contested or unsupported. Tap a label to read the source.",
+  },
+  {
+    icon: MessageCircleQuestion,
+    title: "Ask your own questions",
+    text: "Interrupt mid-debate and the side that’s up answers you.",
+  },
+  {
+    icon: FileText,
+    title: "A committee brief",
+    text: "What both sides agree on, what’s disputed, what’s unsupported, and what to check next. Share it as a link, on LinkedIn, as Markdown or as a PDF.",
+  },
+  {
+    icon: ChartColumn,
+    title: "The maturity wall",
+    text: "When the company’s debt comes due, year by year, from the 10-K’s maturity schedule, with how much of it floats.",
+  },
+  {
+    icon: ArrowLeftRight,
+    title: "Side-by-side comparison",
+    text: "Put two companies’ metrics and debt next to each other.",
+  },
+  {
+    icon: History,
+    title: "History and settings",
+    text: "Replay past debates. Choose the Gemini model and debate length, use your own key, and see what each debate cost.",
+  },
+];
+
 /** The three versions the evaluation compares, all on the same model and the same fact sheet. */
 const VERSIONS = [
   ["A", "Single model", "One AI, one prompt: assess this company’s debt from the fact sheet."],
   ["B", "Debate only", "The Bull and the Bear argue it out, with no fact-checker."],
   ["C", "Full system", "The debate plus the NLI fact-checker and the moderator."],
+] as const;
+
+/** Each comparison isolates one part of the system. */
+const GAINS = [
+  ["A → B", "What the debate adds", "How many fewer false or unsupported claims two opposing analysts make than one AI on its own."],
+  ["B → C", "What the fact-checker adds", "How many more bad claims are caught and kept out of the brief once every claim is checked."],
+  ["A → C", "The whole system", "The total gain, the number we’ll put on the homepage."],
 ] as const;
 
 const MEASURES = [
@@ -67,23 +141,47 @@ export default function RoadmapPage() {
             What’s <span className="bg-linear-to-r from-bull to-bear bg-clip-text text-transparent">next</span>
           </h1>
           <p className="max-w-xl text-muted-foreground">
-            What we’re testing, what we’re building, and where you can help. Plans, not promises: they’ll change as we
-            learn.
+            What you can do today, what we’re measuring, and what we’re building next. Plans, not promises: they’ll change
+            as we learn.
           </p>
+        </section>
+
+        {/* Available today */}
+        <section className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <p className="flex items-center gap-2 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+              <Sparkles className="size-3.5 text-bull" /> Available today
+            </p>
+            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">What you can do right now</h2>
+          </div>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {AVAILABLE.map((f) => (
+              <li key={f.title}>
+                <Card className="h-full">
+                  <CardHeader>
+                    <f.icon className="size-5 text-bull" />
+                    <CardTitle className="mt-2">{f.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">{f.text}</CardContent>
+                </Card>
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* The evaluation */}
         <section className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
             <p className="flex items-center gap-2 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
-              <FlaskConical className="size-3.5 text-bull" /> Now testing
+              <FlaskConical className="size-3.5 text-bull" /> Now measuring
             </p>
             <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-              Does the debate actually make fewer mistakes?
+              Putting a number on what each part adds
             </h2>
             <p className="text-muted-foreground">
-              We’re checking whether Bull vs Bear makes fewer false or unsupported claims than simply asking one AI. Each
-              company runs through three versions, so we can see what the debate adds and what the fact-checker adds.
+              We built Bull vs Bear on a bet: two opposing analysts and an independent fact-checker make fewer mistakes than
+              one AI working alone. Now we’re measuring it. Every company runs through three versions on the same model and
+              the same filings, so we can quantify how much the debate helps and how much each component adds on top.
             </p>
           </div>
 
@@ -100,6 +198,16 @@ export default function RoadmapPage() {
               </li>
             ))}
           </ol>
+
+          <ul className="grid gap-3 sm:grid-cols-3">
+            {GAINS.map(([step, title, text]) => (
+              <li key={step} className="flex flex-col gap-1 rounded-xl border border-bull/30 bg-bull/5 p-4">
+                <span className="font-mono text-xs text-bull">{step}</span>
+                <span className="font-display font-bold">{title}</span>
+                <span className="text-sm text-muted-foreground">{text}</span>
+              </li>
+            ))}
+          </ul>
 
           <div className="grid gap-6 rounded-xl border bg-card p-5 sm:grid-cols-[1fr_1.4fr]">
             <div className="flex flex-col gap-3">
