@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import {
   ArrowLeftRight,
   AudioLines,
+  Bell,
   BookOpen,
   Calculator,
+  CalendarClock,
   CalendarRange,
   ChartColumn,
   FileStack,
@@ -12,6 +14,8 @@ import {
   History,
   Mail,
   MessageCircleQuestion,
+  Route,
+  Scale,
   ScanSearch,
   Search,
   ShieldCheck,
@@ -76,18 +80,51 @@ const AVAILABLE: { icon: typeof BookOpen; title: string; text: string }[] = [
   },
 ];
 
-/** The three versions the evaluation compares, all on the same model and the same fact sheet. */
+/** Where the project goes from here. Each phase ends at a gate we have to pass before moving on. */
+const PHASES = [
+  {
+    phase: "Phase 1",
+    when: "Next ~4 weeks",
+    title: "Prove it works",
+    text: "Run the pilot evaluation below, publish the results, and ship the features marked Up next and Planned.",
+    gate: "A pilot result, good or bad, written up",
+  },
+  {
+    phase: "Phase 2",
+    when: "1–3 months",
+    title: "Get it into real hands",
+    text: "Starting with finance students and investment clubs: watch people use it and learn which parts of the brief matter.",
+    gate: "People come back on their own, or we learn why they don’t",
+  },
+  {
+    phase: "Phase 3",
+    when: "3–6 months",
+    title: "Go deeper",
+    text: "Build what people ask for: quarterly filings, watchlists and alerts, covenants, peers in the debate.",
+    gate: null,
+  },
+  {
+    phase: "Phase 4",
+    when: "6+ months",
+    title: "Decide where it goes",
+    text: "An open project, a research paper or a product, decided with what the earlier phases show.",
+    gate: null,
+  },
+] as const;
+
+/** The four versions the evaluation compares, all on the same model and the same fact sheet. */
 const VERSIONS = [
-  ["A", "Single model", "One AI, one prompt: assess this company’s debt from the fact sheet."],
-  ["B", "Debate only", "The Bull and the Bear argue it out, with no fact-checker."],
-  ["C", "Full system", "The debate plus the NLI fact-checker and the moderator."],
+  ["A", "Single model", "One AI, one prompt: assess this company’s debt from the fact sheet, citing a source for every claim."],
+  ["A′", "Single model, checked", "The same prompt plus the checks the debate uses: quotes copied exactly, numbers found in the cited source."],
+  ["B", "Debate only", "The Bull and the Bear argue it out, with the fact-checker’s labels hidden."],
+  ["C", "Full system", "The debate plus the NLI fact-checker’s labels and the brief built from them."],
 ] as const;
 
 /** Each comparison isolates one part of the system. */
 const GAINS = [
-  ["A → B", "What the debate adds", "How many fewer false or unsupported claims two opposing analysts make than one AI on its own."],
-  ["B → C", "What the fact-checker adds", "How many more bad claims are caught and kept out of the brief once every claim is checked."],
-  ["A → C", "The whole system", "The total gain, the number we’ll put on the homepage."],
+  ["A → A′", "What the checks add", "How many fewer bad claims get through once quotes and numbers must match the source."],
+  ["A′ → B", "What the debate adds", "How many fewer false or unsupported claims two opposing analysts make than one checked AI."],
+  ["B → C", "What the fact-checker adds", "How many bad claims get flagged before you rely on them, and how many good ones get flagged by mistake."],
 ] as const;
 
 const MEASURES = [
@@ -112,6 +149,24 @@ const FEATURES: { icon: typeof BookOpen; title: string; text: string; status: St
     title: "Amended filings",
     text: "When a company files a corrected 10-K/A, use the corrected numbers instead of the original filing’s.",
     status: "Planned",
+  },
+  {
+    icon: CalendarClock,
+    title: "Quarterly filings",
+    text: "Read 10-Qs as well as the 10-K, so the fact sheet is never more than a quarter old.",
+    status: "Later",
+  },
+  {
+    icon: Bell,
+    title: "Watchlists and alerts",
+    text: "Save companies and get a fresh debate when a new filing moves their metrics.",
+    status: "Later",
+  },
+  {
+    icon: Scale,
+    title: "Covenants",
+    text: "Pull covenant terms from credit agreements and show how much room the company has left.",
+    status: "Later",
   },
   {
     icon: BookOpen,
@@ -169,6 +224,42 @@ export default function RoadmapPage() {
           </ul>
         </section>
 
+        {/* The plan */}
+        <section className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <p className="flex items-center gap-2 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+              <Route className="size-3.5 text-bull" /> The plan
+            </p>
+            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Four phases, one gate at a time</h2>
+            <p className="text-muted-foreground">
+              Bull vs Bear took second place at the hackathon it was built for. Next we prove it’s reliable, then find out
+              who needs it most. We only move to the next phase once we pass the gate.
+            </p>
+          </div>
+          <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {PHASES.map((p, i) => (
+              <li key={p.phase}>
+                <Card className={cn("h-full", i === 0 && "border-bull/50 bg-bull/5")}>
+                  <CardHeader>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {p.phase} · {p.when}
+                    </span>
+                    <CardTitle className="mt-1">{p.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-1 flex-col gap-3 text-sm text-muted-foreground">
+                    <p>{p.text}</p>
+                    {p.gate && (
+                      <p className="mt-auto border-t pt-3">
+                        <span className="font-medium text-foreground">Gate:</span> {p.gate}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         {/* The evaluation */}
         <section className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
@@ -180,12 +271,12 @@ export default function RoadmapPage() {
             </h2>
             <p className="text-muted-foreground">
               We built Bull vs Bear on a bet: two opposing analysts and an independent fact-checker make fewer mistakes than
-              one AI working alone. Now we’re measuring it. Every company runs through three versions on the same model and
-              the same filings, so we can quantify how much the debate helps and how much each component adds on top.
+              one AI working alone. Now we’re measuring it. Every company runs through four versions on the same model and
+              the same filings, so we can measure what each part adds: the source checks, the debate and the fact-checker.
             </p>
           </div>
 
-          <ol className="grid gap-3 sm:grid-cols-3">
+          <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {VERSIONS.map(([letter, title, text]) => (
               <li key={letter}>
                 <Card className="h-full">
